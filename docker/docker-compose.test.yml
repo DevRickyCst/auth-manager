@@ -1,0 +1,28 @@
+services:
+  auth-db-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth_test_db
+    ports:
+      - "5433:5432"
+
+  test-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile # Utilise ton Dockerfile avec diesel_cli
+    platform: linux/amd64
+    working_dir: /app
+    volumes:
+      - ../:/app
+      - target_test:/app/target
+      - cargo_test:/usr/local/cargo/registry
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@auth-db-test:5432/auth_test_db
+    depends_on:
+      - auth-db-test
+
+volumes:
+  target_test:
+  cargo_test:

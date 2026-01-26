@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  auth-manager:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    working_dir: /app
+    volumes:
+      - ../:/app
+      - target:/app/target
+      - cargo:/usr/local/cargo/registry
+    environment:
+      DATABASE_URL: "postgres://postgres:postgres@auth_db:5432/auth_db"
+    depends_on:
+      - auth_db
+    command: cargo watch -x run
+
+  auth_db:
+    image: postgres:17-alpine
+    container_name: auth-manager-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+
+volumes:
+  target:
+  cargo:
+  auth_db_data:
