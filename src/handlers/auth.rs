@@ -1,20 +1,30 @@
 // src/handlers/auth.rs
 
 use axum::{
-    extract::ConnectInfo,
-    http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    http::{HeaderMap, HeaderValue, StatusCode},
     Json,
 };
-use std::net::SocketAddr;
-
+use axum::extract::{State, Extension};
+use std::sync::Arc;
 use crate::auth::services::AuthService;
 use crate::dto::requests::{LoginRequest, RegisterRequest, RefreshTokenRequest};
-use crate::dto::responses::{LoginResponse, RefreshTokenResponse, UserResponse};
+use crate::dto::responses::{RefreshTokenResponse, UserResponse, PublicLoginResponse};
 use crate::error::AppError;
+use crate::auth::extractors::AuthClaims;
 
 /// POST /auth/register
 /// Inscription d'un nouvel utilisateur
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    tag = "Auth",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "Created", body = UserResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 409, description = "Email already exists", body = crate::error::ErrorResponse)
+    )
+)]
 pub async fn register(
     Json(payload): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<UserResponse>), AppError> {
@@ -24,40 +34,100 @@ pub async fn register(
 
 /// POST /auth/login
 /// Connexion d'un utilisateur
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "Auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "OK", body = PublicLoginResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Invalid credentials", body = crate::error::ErrorResponse),
+        (status = 404, description = "User not found", body = crate::error::ErrorResponse)
+    )
+)]
 pub async fn login(
-    Json(payload): Json<LoginRequest>,
+    State(auth_service): State<Arc<AuthService>>,
     headers: HeaderMap,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> Result<Json<LoginResponse>, AppError> {
+    Json(payload): Json<LoginRequest>,
+) -> Result<(StatusCode, HeaderMap, Json<PublicLoginResponse>), AppError> {
     // Récupère le User-Agent s'il existe
     let user_agent = headers
         .get("user-agent")
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string());
 
-    // Crée le service (normalement injecté via DI)
-    let jwt_manager = crate::auth::jwt::JwtManager::new("your_secret_key");
-    let service = AuthService::new(jwt_manager);
+    let (response, refresh_hash) = auth_service.login(payload, user_agent)?;
 
-    let response = service.login(payload, user_agent)?;
-    Ok(Json(response))
+    // Build Set-Cookie header for refresh token hash
+    let cookie_val = format!(
+        "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh",
+        refresh_hash
+    );
+    let mut out_headers = HeaderMap::new();
+    out_headers.insert(
+        axum::http::header::SET_COOKIE,
+        HeaderValue::from_str(&cookie_val).map_err(|_| AppError::internal("Failed to set cookie"))?,
+    );
+
+    let public = PublicLoginResponse::from(response);
+    Ok((StatusCode::OK, out_headers, Json(public)))
 }
 
 /// POST /auth/refresh
 /// Rafraîchissement des tokens
+#[utoipa::path(
+    post,
+    path = "/auth/refresh",
+    tag = "Auth",
+    responses(
+        (status = 200, description = "OK", body = RefreshTokenResponse),
+        (status = 400, description = "Missing or invalid cookie", body = crate::error::ErrorResponse),
+        (status = 401, description = "Invalid or expired refresh token", body = crate::error::ErrorResponse)
+    )
+)]
 pub async fn refresh_token(
-    Json(payload): Json<RefreshTokenRequest>,
+    State(auth_service): State<Arc<AuthService>>,
+    headers: HeaderMap,
 ) -> Result<Json<RefreshTokenResponse>, AppError> {
-    let jwt_manager = crate::auth::jwt::JwtManager::new("your_secret_key");
-    let service = AuthService::new(jwt_manager);
+    // Read refresh_token hash from Cookie header
+    let raw_cookie = headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| AppError::validation("Missing Cookie header"))?;
 
-    let response = service.refresh_token(payload)?;
+    let refresh_hash = raw_cookie
+        .split(';')
+        .filter_map(|kv| {
+            let mut it = kv.trim().splitn(2, '=');
+            match (it.next(), it.next()) {
+                (Some("refresh_token"), Some(v)) => Some(v.trim().to_string()),
+                _ => None,
+            }
+        })
+        .next()
+        .ok_or_else(|| AppError::validation("Missing refresh_token cookie"))?;
+
+    let response = auth_service.refresh_token(RefreshTokenRequest { refresh_token: refresh_hash })?;
     Ok(Json(response))
 }
 
 /// POST /auth/logout
 /// Déconnexion (optionnel)
-pub async fn logout() -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+#[utoipa::path(
+    post,
+    path = "/auth/logout",
+    tag = "Auth",
+    responses(
+        (status = 200, description = "OK", body = serde_json::Value),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse)
+    )
+)]
+pub async fn logout(
+    claims: AuthClaims,
+    Extension(auth_service): Extension<Arc<AuthService>>,
+) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+    auth_service.logout(claims.sub)?;
     Ok((
         StatusCode::OK,
         Json(serde_json::json!({ "message": "Logged out successfully" })),

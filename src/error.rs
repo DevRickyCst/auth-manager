@@ -7,8 +7,9 @@ use axum::{
     Json,
 };
 use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
     pub message: String,
@@ -38,16 +39,19 @@ pub enum AppError {
 
     // === Erreurs de Validation ===
     ValidationError(String),
+    #[allow(dead_code)]
     MissingField(String),
     InvalidInput(String),
 
     // === Erreurs métier ===
     UnauthorizedAction(String),
+    #[allow(dead_code)]
     ResourceLocked(String),
     TooManyAttempts(String),
 
     // === Erreurs internes ===
     InternalServerError(String),
+    #[allow(dead_code)]
     ConfigurationError(String),
 }
 
@@ -266,6 +270,7 @@ impl AppError {
         AppError::ValidationError(msg.into())
     }
 
+    #[allow(dead_code)]
     pub fn missing_field(field: impl Into<String>) -> Self {
         AppError::MissingField(field.into())
     }

@@ -23,6 +23,7 @@ pub struct User {
     pub email_verified: bool,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
+    #[allow(dead_code)]
     pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
 }

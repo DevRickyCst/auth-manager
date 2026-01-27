@@ -12,8 +12,8 @@ use tracing;
 use app::build_router;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+mod docs;
 
-use std::sync::Arc;
 
 pub async fn setup_logging() {
     tracing_subscriber::registry()
@@ -31,9 +31,7 @@ async fn main() -> Result<(), lambda_http::Error> {
     );
 
     // 2. Créer l'AuthService
-    let auth_service = Arc::new(auth::services::AuthService::new(jwt_manager));
-    let app = build_router(auth_service);
-
+    let app = build_router(jwt_manager);
 
     if env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
         // Lambda

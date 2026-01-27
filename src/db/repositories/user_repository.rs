@@ -56,6 +56,19 @@ impl UserRepository {
         Ok(())
     }
 
+    // Mettre à jour le mot de passe
+    pub fn update_password(id: Uuid, new_password_hash: &str) -> Result<(), RepositoryError> {
+        let mut conn = get_connection()
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+
+        diesel::update(users::table.filter(users::id.eq(id)))
+            .set(users::password_hash.eq(new_password_hash))
+            .execute(&mut conn)
+            .map_err(map_diesel_error)?;
+        
+        Ok(())
+    }
+
     /// Supprimer un utilisateur
     pub fn delete(id: Uuid) -> Result<(), RepositoryError> {
         let mut conn = get_connection()
@@ -74,6 +87,7 @@ impl UserRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::password::PasswordManager;
 
     fn create_test_user(suffix: &str) -> NewUser {
         NewUser {
@@ -217,5 +231,33 @@ mod tests {
 
         // Cleanup
         let _ = UserRepository::delete(created1.id);
+    }
+
+    // ============================================
+    // Test 8: Update password
+    // ============================================
+    #[test]
+    fn test_update_password_success() {
+        let new_user = NewUser {
+            email: format!("update_pw_{}@example.com", Uuid::new_v4()),
+            username: "update_pw_user".to_string(),
+            password_hash: Some(PasswordManager::hash("OldPass123!").expect("hash")),
+        };
+
+        let created = UserRepository::create(&new_user).expect("Failed to create user");
+        let user_id = created.id;
+
+        let new_hash = PasswordManager::hash("NewPass456!").expect("hash");
+        let result = UserRepository::update_password(user_id, &new_hash);
+        assert!(result.is_ok(), "Should update password successfully");
+
+        let updated = UserRepository::find_by_id(user_id)
+            .expect("Should find user")
+            .expect("User should exist");
+        let hash = updated.password_hash.as_ref().expect("hash present");
+        let ok = PasswordManager::verify("NewPass456!", hash).expect("verify");
+        assert!(ok, "New password should verify");
+
+        let _ = UserRepository::delete(user_id);
     }
 }

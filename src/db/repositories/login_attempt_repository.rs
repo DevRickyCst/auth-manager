@@ -25,6 +25,7 @@ impl LoginAttemptRepository {
     }
 
     /// Compter les tentatives échouées pour un user dans les X dernières minutes
+    #[allow(dead_code)]
     pub fn count_failed_attempts(user_id: Uuid, minutes: i64) -> Result<i64, RepositoryError> {
         let mut conn = get_connection()
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -39,6 +40,7 @@ impl LoginAttemptRepository {
     }
 
     /// Récupérer les dernières tentatives d'un user
+    #[allow(dead_code)]
     pub fn find_by_user(user_id: Uuid, limit: i64) -> Result<Vec<LoginAttempt>, RepositoryError> {
         let mut conn = get_connection()
             .map_err(|e| RepositoryError::Database(e.to_string()))?;

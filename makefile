@@ -25,6 +25,7 @@ migrate:
 revert:
 	$(COMPOSE_DEV) run --rm auth-manager diesel migration revert
 
+t ?=
 test:
-	$(COMPOSE_TEST) run --rm test-runner bash -c "diesel database setup && cargo test -- --test-threads=1"
+	$(COMPOSE_TEST) run --rm test-runner bash -c "diesel database setup && cargo test $(t) -- --test-threads=5"
 	$(COMPOSE_TEST) stop auth-db-test

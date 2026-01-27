@@ -10,6 +10,7 @@ pub struct Claims {
     pub iat: i64,
 }
 
+#[derive(Clone)]
 pub struct JwtManager {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,

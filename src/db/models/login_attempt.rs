@@ -15,9 +15,14 @@ pub struct NewLoginAttempt<'a> {
 #[derive(Queryable, Selectable, Debug, Clone)]
 #[diesel(table_name = login_attempts)]
 pub struct LoginAttempt {
+    #[allow(dead_code)]
     pub id: Uuid,
+    #[allow(dead_code)]
     pub user_id: Option<Uuid>,
+    #[allow(dead_code)]
     pub success: bool,
+    #[allow(dead_code)]
     pub attempted_at: DateTime<Utc>,
+    #[allow(dead_code)]
     pub user_agent: Option<String>,
 }

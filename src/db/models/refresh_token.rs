@@ -18,6 +18,8 @@ pub struct RefreshToken {
     pub user_id: Uuid,
     pub token_hash: String,
     pub expires_at: DateTime<Utc>,
+    #[allow(dead_code)]
     pub created_at: DateTime<Utc>,
+    #[allow(dead_code)]
     pub updated_at: DateTime<Utc>,
 }
