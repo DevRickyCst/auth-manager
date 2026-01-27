@@ -15,15 +15,6 @@ use std::sync::Arc;
 
 /// GET /users/me
 /// Récupère le profil de l'utilisateur courant
-#[utoipa::path(
-    get,
-    path = "/users/me",
-    tag = "Users",
-    responses(
-        (status = 200, description = "OK", body = crate::dto::responses::UserResponse),
-        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn get_current_user(
     claims: AuthClaims,
     Extension(service): Extension<Arc<AuthService>>,
@@ -34,19 +25,6 @@ pub async fn get_current_user(
 
 /// GET /users/:id
 /// Récupère un utilisateur par son ID
-#[utoipa::path(
-    get,
-    path = "/users/{id}",
-    tag = "Users",
-    params(
-        ("id" = Uuid, Path, description = "User ID")
-    ),
-    responses(
-        (status = 200, description = "OK", body = crate::dto::responses::UserResponse),
-        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
-        (status = 404, description = "Not found", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn get_user_by_id(
     Path(user_id): Path<Uuid>,
     _claims: AuthClaims,
@@ -58,18 +36,6 @@ pub async fn get_user_by_id(
 
 /// DELETE /users/:id
 /// Supprime un utilisateur
-#[utoipa::path(
-    delete,
-    path = "/users/{id}",
-    tag = "Users",
-    params(
-        ("id" = Uuid, Path, description = "User ID")
-    ),
-    responses(
-        (status = 204, description = "No Content"),
-        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn delete_user(
     Path(user_id): Path<Uuid>,
     claims: AuthClaims,
@@ -87,20 +53,6 @@ pub async fn delete_user(
 
 /// POST /users/:id/change-password
 /// Change le mot de passe de l'utilisateur
-#[utoipa::path(
-    post,
-    path = "/users/{id}/change-password",
-    tag = "Users",
-    params(
-        ("id" = Uuid, Path, description = "User ID")
-    ),
-    request_body = crate::dto::requests::ChangePasswordRequest,
-    responses(
-        (status = 200, description = "OK"),
-        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn change_password(
     Path(user_id): Path<Uuid>,
     claims: AuthClaims,

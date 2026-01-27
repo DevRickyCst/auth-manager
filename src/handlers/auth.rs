@@ -14,17 +14,6 @@ use crate::auth::extractors::AuthClaims;
 
 /// POST /auth/register
 /// Inscription d'un nouvel utilisateur
-#[utoipa::path(
-    post,
-    path = "/auth/register",
-    tag = "Auth",
-    request_body = RegisterRequest,
-    responses(
-        (status = 201, description = "Created", body = UserResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
-        (status = 409, description = "Email already exists", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn register(
     Json(payload): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<UserResponse>), AppError> {
@@ -34,18 +23,6 @@ pub async fn register(
 
 /// POST /auth/login
 /// Connexion d'un utilisateur
-#[utoipa::path(
-    post,
-    path = "/auth/login",
-    tag = "Auth",
-    request_body = LoginRequest,
-    responses(
-        (status = 200, description = "OK", body = PublicLoginResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
-        (status = 401, description = "Invalid credentials", body = crate::error::ErrorResponse),
-        (status = 404, description = "User not found", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn login(
     State(auth_service): State<Arc<AuthService>>,
     headers: HeaderMap,
@@ -76,16 +53,6 @@ pub async fn login(
 
 /// POST /auth/refresh
 /// Rafraîchissement des tokens
-#[utoipa::path(
-    post,
-    path = "/auth/refresh",
-    tag = "Auth",
-    responses(
-        (status = 200, description = "OK", body = RefreshTokenResponse),
-        (status = 400, description = "Missing or invalid cookie", body = crate::error::ErrorResponse),
-        (status = 401, description = "Invalid or expired refresh token", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn refresh_token(
     State(auth_service): State<Arc<AuthService>>,
     headers: HeaderMap,
@@ -114,15 +81,6 @@ pub async fn refresh_token(
 
 /// POST /auth/logout
 /// Déconnexion (optionnel)
-#[utoipa::path(
-    post,
-    path = "/auth/logout",
-    tag = "Auth",
-    responses(
-        (status = 200, description = "OK", body = serde_json::Value),
-        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse)
-    )
-)]
 pub async fn logout(
     claims: AuthClaims,
     Extension(auth_service): Extension<Arc<AuthService>>,
