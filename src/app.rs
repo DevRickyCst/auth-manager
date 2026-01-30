@@ -7,8 +7,7 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
-use utoipa_swagger_ui::SwaggerUi;
-use utoipa::OpenApi;
+ 
 
 use crate::auth::services::AuthService;
 use crate::auth::jwt::JwtManager;
@@ -121,16 +120,6 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
         .nest("/users", user_routes(jwt_manager))
         // Middleware global de tracing
         .layer(TraceLayer::new_for_http());
-
-    // Mount Swagger UI locally only (not in Lambda)
-    let router = if std::env::var("AWS_LAMBDA_FUNCTION_NAME").is_err() {
-        router.merge(
-            SwaggerUi::new("/swagger-ui")
-                .url("/api-doc/openapi.json", crate::docs::ApiDoc::openapi()),
-        )
-    } else {
-        router
-    };
 
     router
 }

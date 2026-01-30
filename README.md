@@ -37,6 +37,22 @@ Rust authentication service built on Axum, Tokio, Diesel (PostgreSQL), and JSON 
   - `tracing` + `tracing-subscriber` for structured logs.
   - `tower-http` (trace, cors) for HTTP-level tracing and CORS.
 
+## API Documentation
+- Swagger UI (local only): browse at http://localhost:3000/swagger-ui
+- OpenAPI JSON: http://localhost:3000/api-doc/openapi.json
+- OpenAPI YAML: maintained in [openapi/openapi.yaml](openapi/openapi.yaml)
+
+Regenerate YAML quickly from the JSON (requires `yq`):
+
+```bash
+curl -s http://localhost:3000/api-doc/openapi.json \
+  | yq -p=json -o=yaml > openapi/openapi.yaml
+```
+
+Notes:
+- Swagger UI is mounted only when not running in AWS Lambda.
+- OpenAPI is defined via `utoipa` annotations in handlers and DTOs; aggregation lives in [src/docs.rs](src/docs.rs).
+
 ## Execution Modes
 - Local HTTP Server:
   - Runs a standard Axum server under Tokio.
@@ -150,6 +166,18 @@ cargo run
 - The service starts an Axum server using Tokio.
 - Use `RUST_LOG=debug` for more verbose traces during development.
 
+### Docker Compose
+Use Make targets to run the full local stack (app + Postgres):
+
+```bash
+make local              # build and start containers
+make migrate            # run Diesel migrations inside the container
+make revert             # revert last migration
+make test               # run tests in a test runner container
+```
+
+Once `make local` is up, visit Swagger UI at http://localhost:3000/swagger-ui and the health probe at http://localhost:3000/health.
+
 ## AWS Lambda: Build & Deploy
 Two options: manual packaging or using `cargo-lambda`.
 
@@ -211,6 +239,23 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 - Testing:
   - Unit-test services and repositories; avoid coupling tests to handlers.
+
+## Postman Collection
+- Import the collection at [postman/AuthManager.postman_collection.json](postman/AuthManager.postman_collection.json).
+- The collection scripts automatically store `access_token`, `refresh_token`, and `userId` on successful login/refresh and clear them on logout.
+
+## Endpoints Overview
+- Health: `GET /health`
+- Auth:
+  - `POST /auth/register`
+  - `POST /auth/login`
+  - `POST /auth/refresh`
+  - `POST /auth/logout`
+- Users:
+  - `GET /users/me`
+  - `GET /users/{id}`
+  - `DELETE /users/{id}`
+  - `POST /users/{id}/change-password`
 
 ## Notes
 - Verify runtime selection (local vs Lambda) in [src/main.rs](src/main.rs) and `docker/` files.

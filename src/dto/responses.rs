@@ -1,9 +1,8 @@
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
-use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserResponse {
     pub id: Uuid,
     pub email: String,
@@ -13,7 +12,7 @@ pub struct UserResponse {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Debug, ToSchema)]
+#[derive(Serialize, Debug)]
 pub struct LoginResponse {
     pub access_token: String,
     pub refresh_token: String,
@@ -22,7 +21,7 @@ pub struct LoginResponse {
 }
 
 /// Public login response (does not include refresh token)
-#[derive(Serialize, Debug, ToSchema)]
+#[derive(Serialize, Debug)]
 pub struct PublicLoginResponse {
     pub access_token: String,
     pub user: UserResponse,
@@ -39,13 +38,13 @@ impl From<LoginResponse> for PublicLoginResponse {
     }
 }
 
-#[derive(Serialize, Debug, ToSchema)]
+#[derive(Serialize, Debug)]
 pub struct RefreshTokenResponse {
     pub access_token: String,
     pub expires_in: i64,
 }
 
-#[derive(Serialize, Debug, ToSchema)]
+#[derive(Serialize, Debug)]
 #[allow(dead_code)]
 pub struct ErrorResponse {
     pub error: String,

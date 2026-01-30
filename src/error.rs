@@ -7,9 +7,9 @@ use axum::{
     Json,
 };
 use serde::Serialize;
-use utoipa::ToSchema;
+ 
 
-#[derive(Debug, Serialize, Clone, ToSchema)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ErrorResponse {
     pub error: String,
     pub message: String,
