@@ -1,6 +1,6 @@
 use diesel::{Insertable, Queryable, Selectable, AsChangeset};
 use chrono::{DateTime, Utc};
-use crate::dto::responses::UserResponse;
+use crate::api::UserResponse;
 use uuid::Uuid;
 use crate::db::schema::users;
 

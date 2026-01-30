@@ -6,16 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde::Serialize;
- 
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ErrorResponse {
-    pub error: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<String>,
-}
+use crate::api::ErrorResponse;
 
 #[derive(Debug, Clone)]
 pub enum AppError {

@@ -1,12 +1,9 @@
-use axum::{http::StatusCode, Json};
+use crate::api::AppResponse;
 
 /// GET /health
 /// Simple healthcheck endpoint
-pub async fn health() -> (StatusCode, Json<serde_json::Value>) {
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "status": "ok"
-        })),
-    )
+pub async fn health() -> AppResponse<serde_json::Value> {
+    AppResponse::ok(serde_json::json!({
+        "status": "ok"
+    }))
 }

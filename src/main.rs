@@ -1,9 +1,8 @@
 use std::env;
 mod app;
-mod dto;
+mod api;
 mod auth;
 mod db;
-mod utils;
 mod handlers;
 mod error;
 

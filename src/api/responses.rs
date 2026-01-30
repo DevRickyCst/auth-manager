@@ -43,10 +43,3 @@ pub struct RefreshTokenResponse {
     pub access_token: String,
     pub expires_in: i64,
 }
-
-#[derive(Serialize, Debug)]
-#[allow(dead_code)]
-pub struct ErrorResponse {
-    pub error: String,
-    pub message: String,
-}
