@@ -38,6 +38,7 @@ pub enum AppError {
     UnauthorizedAction(String),
     #[allow(dead_code)]
     ResourceLocked(String),
+    #[allow(dead_code)]
     TooManyAttempts(String),
 
     // === Erreurs internes ===
@@ -274,6 +275,7 @@ impl AppError {
         AppError::UnauthorizedAction(msg.into())
     }
 
+    #[allow(dead_code)]
     pub fn too_many_attempts(msg: impl Into<String>) -> Self {
         AppError::TooManyAttempts(msg.into())
     }
@@ -287,6 +289,7 @@ impl AppError {
     }
 
     /// Retourne le code de statut HTTP
+    #[allow(dead_code)]
     pub fn status_code(&self) -> StatusCode {
         self.get_error_info().0
     }

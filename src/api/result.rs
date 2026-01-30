@@ -69,6 +69,7 @@ where
     }
 
     /// 202 Accepted avec des données
+    #[allow(dead_code)]
     pub fn accepted(body: T) -> Self {
         Self::new(StatusCode::ACCEPTED, body)
     }
@@ -102,6 +103,7 @@ where
 
 /// Type alias pour les résultats des handlers
 /// Utilise AppResponse pour les succès et AppError pour les erreurs
+#[allow(dead_code)]
 pub type AppResult<T> = Result<AppResponse<T>, crate::error::AppError>;
 
 #[cfg(test)]

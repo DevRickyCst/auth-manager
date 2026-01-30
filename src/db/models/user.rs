@@ -25,6 +25,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     #[allow(dead_code)]
     pub updated_at: DateTime<Utc>,
+    #[allow(dead_code)]
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
