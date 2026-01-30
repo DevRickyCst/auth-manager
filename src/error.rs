@@ -6,16 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde::Serialize;
- 
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ErrorResponse {
-    pub error: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<String>,
-}
+use crate::api::ErrorResponse;
 
 #[derive(Debug, Clone)]
 pub enum AppError {
@@ -47,6 +38,7 @@ pub enum AppError {
     UnauthorizedAction(String),
     #[allow(dead_code)]
     ResourceLocked(String),
+    #[allow(dead_code)]
     TooManyAttempts(String),
 
     // === Erreurs internes ===
@@ -283,6 +275,7 @@ impl AppError {
         AppError::UnauthorizedAction(msg.into())
     }
 
+    #[allow(dead_code)]
     pub fn too_many_attempts(msg: impl Into<String>) -> Self {
         AppError::TooManyAttempts(msg.into())
     }
@@ -296,6 +289,7 @@ impl AppError {
     }
 
     /// Retourne le code de statut HTTP
+    #[allow(dead_code)]
     pub fn status_code(&self) -> StatusCode {
         self.get_error_info().0
     }

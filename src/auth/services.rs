@@ -1,7 +1,9 @@
 // src/auth/services.rs
 
-use crate::dto::responses::{UserResponse, LoginResponse, RefreshTokenResponse};
-use crate::dto::requests::{RegisterRequest, LoginRequest, RefreshTokenRequest};
+use crate::api::{
+    UserResponse, LoginResponse, RefreshTokenResponse,
+    RegisterRequest, LoginRequest, RefreshTokenRequest,
+};
 use crate::error::AppError;
 
 use crate::db::models::user::NewUser;

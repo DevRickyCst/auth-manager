@@ -25,12 +25,13 @@ pub fn get_connection() -> Result<DbConnection> {
 // ============================================
 // CREATE POOL - Si tu veux créer manuellement (optionnel)
 // ============================================
+#[cfg(test)]
 pub fn create_pool() -> Result<DbPool> {
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
-    
+
     let manager = ConnectionManager::<PgConnection>::new(&database_url);
-    
+
     diesel::r2d2::Pool::builder()
         .max_size(5)
         .build(manager)

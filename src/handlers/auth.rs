@@ -1,14 +1,17 @@
 // src/handlers/auth.rs
 
 use axum::{
-    http::{HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue},
     Json,
 };
 use axum::extract::{State, Extension};
 use std::sync::Arc;
 use crate::auth::services::AuthService;
-use crate::dto::requests::{LoginRequest, RegisterRequest, RefreshTokenRequest};
-use crate::dto::responses::{RefreshTokenResponse, UserResponse, PublicLoginResponse};
+use crate::api::{
+    LoginRequest, RegisterRequest, RefreshTokenRequest,
+    RefreshTokenResponse, UserResponse, PublicLoginResponse,
+    AppResponse,
+};
 use crate::error::AppError;
 use crate::auth::extractors::AuthClaims;
 
@@ -16,9 +19,9 @@ use crate::auth::extractors::AuthClaims;
 /// Inscription d'un nouvel utilisateur
 pub async fn register(
     Json(payload): Json<RegisterRequest>,
-) -> Result<(StatusCode, Json<UserResponse>), AppError> {
+) -> Result<AppResponse<UserResponse>, AppError> {
     let user = AuthService::register(payload)?;
-    Ok((StatusCode::CREATED, Json(user)))
+    Ok(AppResponse::created(user))
 }
 
 /// POST /auth/login
@@ -27,7 +30,7 @@ pub async fn login(
     State(auth_service): State<Arc<AuthService>>,
     headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
-) -> Result<(StatusCode, HeaderMap, Json<PublicLoginResponse>), AppError> {
+) -> Result<AppResponse<PublicLoginResponse>, AppError> {
     // Récupère le User-Agent s'il existe
     let user_agent = headers
         .get("user-agent")
@@ -48,7 +51,7 @@ pub async fn login(
     );
 
     let public = PublicLoginResponse::from(response);
-    Ok((StatusCode::OK, out_headers, Json(public)))
+    Ok(AppResponse::ok(public).with_headers(out_headers))
 }
 
 /// POST /auth/refresh
@@ -56,7 +59,7 @@ pub async fn login(
 pub async fn refresh_token(
     State(auth_service): State<Arc<AuthService>>,
     headers: HeaderMap,
-) -> Result<Json<RefreshTokenResponse>, AppError> {
+) -> Result<AppResponse<RefreshTokenResponse>, AppError> {
     // Read refresh_token hash from Cookie header
     let raw_cookie = headers
         .get(axum::http::header::COOKIE)
@@ -76,7 +79,7 @@ pub async fn refresh_token(
         .ok_or_else(|| AppError::validation("Missing refresh_token cookie"))?;
 
     let response = auth_service.refresh_token(RefreshTokenRequest { refresh_token: refresh_hash })?;
-    Ok(Json(response))
+    Ok(AppResponse::ok(response))
 }
 
 /// POST /auth/logout
@@ -84,10 +87,9 @@ pub async fn refresh_token(
 pub async fn logout(
     claims: AuthClaims,
     Extension(auth_service): Extension<Arc<AuthService>>,
-) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+) -> Result<AppResponse<serde_json::Value>, AppError> {
     auth_service.logout(claims.sub)?;
-    Ok((
-        StatusCode::OK,
-        Json(serde_json::json!({ "message": "Logged out successfully" })),
-    ))
+    Ok(AppResponse::ok(serde_json::json!({
+        "message": "Logged out successfully"
+    })))
 }
