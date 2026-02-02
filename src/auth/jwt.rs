@@ -63,6 +63,7 @@ mod tests {
     // ============================================
     // Helper
     // ============================================
+    #[cfg(test)]
     fn get_jwt_manager() -> JwtManager {
         JwtManager::new("my_secret_key_for_tests")
     }

@@ -1,6 +1,6 @@
 use diesel::{Insertable, Queryable, Selectable, AsChangeset};
 use chrono::{DateTime, Utc};
-use crate::dto::responses::UserResponse;
+use crate::api::UserResponse;
 use uuid::Uuid;
 use crate::db::schema::users;
 
@@ -25,6 +25,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     #[allow(dead_code)]
     pub updated_at: DateTime<Utc>,
+    #[allow(dead_code)]
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
