@@ -36,3 +36,48 @@ COPY --from=dev-tools /usr/local/cargo/bin/diesel /usr/local/cargo/bin/
 
 # Development container stays running with cargo-watch
 CMD ["cargo", "watch", "-x", "run"]
+
+# ============================================================================
+# Stage: builder
+# Build optimized release binary for production/Lambda
+# ============================================================================
+FROM rust:1.92 AS builder
+
+WORKDIR /build
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files first for caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create dummy src to cache dependencies
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Copy actual source code
+COPY src ./src
+
+# Build the actual binary
+RUN cargo build --release
+
+# ============================================================================
+# Stage: runtime (for Lambda)
+# Minimal runtime image with AWS Lambda Runtime Interface Client
+# ============================================================================
+FROM public.ecr.aws/lambda/provided:al2023 AS runtime
+
+# Install PostgreSQL client library (required by Diesel)
+RUN dnf install -y libpq && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
+# Copy the compiled binary and rename it to bootstrap (required by Lambda)
+COPY --from=builder /build/target/release/auth-manager ${LAMBDA_RUNTIME_DIR}/bootstrap
+
+# Set the CMD to the handler (could also be done using the Docker CMD parameter)
+CMD ["bootstrap"]

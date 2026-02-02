@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Auth Manager - Production Serverless Authentication Service
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: PostgreSQL connection string
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Description: JWT secret key for token signing
+
+  CorsAllowedOrigins:
+    Type: String
+    Default: '*'
+    Description: Comma-separated list of allowed CORS origins
+
+  LambdaMemorySize:
+    Type: Number
+    Default: 1024
+    Description: Lambda memory in MB
+
+  LambdaTimeout:
+    Type: Number
+    Default: 30
+    Description: Lambda timeout in seconds
+
+Resources:
+  # ============================================================================
+  # Lambda Function
+  # ============================================================================
+  # Note: ECR Repository is created manually by the deployment script
+  AuthManagerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: auth-manager-prod
+      PackageType: Image
+      ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/auth-manager-prod:latest'
+      Timeout: !Ref LambdaTimeout
+      MemorySize: !Ref LambdaMemorySize
+      Architectures:
+        - x86_64
+      Tracing: Active
+      Environment:
+        Variables:
+          RUST_LOG: info,auth_manager=info,hyper_util=warn,tower_http=warn
+          APP_ENV: production
+          DATABASE_URL: !Ref DatabaseUrl
+          JWT_SECRET: !Ref JwtSecret
+          CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
+          CORS_ALLOWED_METHODS: GET,POST,PUT,DELETE,OPTIONS
+          BCRYPT_COST: '12'
+      Events:
+        HttpApiEvent:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            ApiId: !Ref HttpApi
+        HttpApiRootEvent:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+            ApiId: !Ref HttpApi
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXRayDaemonWriteAccess
+      Tags:
+        Environment: production
+        Application: auth-manager
+    Metadata:
+      DockerTag: v1
+      DockerContext: ..
+      Dockerfile: docker/Dockerfile
+
+  # ============================================================================
+  # API Gateway HTTP API
+  # ============================================================================
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - '*'
+        MaxAge: 300
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogs.Arn
+        Format: '$context.requestId $context.error.message $context.error.messageString'
+      Tags:
+        Environment: production
+        Application: auth-manager
+
+  # ============================================================================
+  # CloudWatch Logs
+  # ============================================================================
+  ApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/auth-manager-prod
+      RetentionInDays: 30
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AuthManagerFunction}'
+      RetentionInDays: 30
+
+  # ============================================================================
+  # CloudWatch Alarms
+  # ============================================================================
+  FunctionErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: auth-manager-prod-errors
+      AlarmDescription: Alert when Lambda errors exceed threshold
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AuthManagerFunction
+      TreatMissingData: notBreaching
+
+  FunctionThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: auth-manager-prod-throttles
+      AlarmDescription: Alert when Lambda is throttled
+      MetricName: Throttles
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AuthManagerFunction
+      TreatMissingData: notBreaching
+
+Outputs:
+  ECRRepositoryUri:
+    Description: ECR Repository URI
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/auth-manager-prod'
+    Export:
+      Name: !Sub '${AWS::StackName}-ECRRepositoryUri'
+
+  FunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt AuthManagerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
+
+  ApiUrl:
+    Description: API Gateway Endpoint URL
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiUrl'
+
+  ApiId:
+    Description: API Gateway ID
+    Value: !Ref HttpApi
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiId'

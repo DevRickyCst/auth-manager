@@ -1,0 +1,37 @@
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "auth-manager-prod"
+region = "eu-central-1"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+resolve_s3 = true
+s3_prefix = "auth-manager-prod"
+region = "eu-central-1"
+image_repositories = ["AuthManagerFunction=859456618518.dkr.ecr.eu-central-1.amazonaws.com/auth-manager-prod"]
+parameter_overrides = [
+    "DatabaseUrl=postgres://user:pass@host:5432/db",
+    "JwtSecret=CHANGE_ME_IN_PRODUCTION",
+    "CorsAllowedOrigins=https://yourdomain.com",
+    "LambdaMemorySize=1024",
+    "LambdaTimeout=30"
+]
+
+[default.package.parameters]
+resolve_s3 = true
+
+[default.sync.parameters]
+watch = true
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+[default.local_start_lambda.parameters]
+warm_containers = "EAGER"

@@ -31,6 +31,12 @@ help: ## Show this help message
 	@echo "  make test t=test_login        # Run specific test"
 	@echo "  make logs                     # Follow all logs"
 	@echo "  make shell                    # Open shell in app container"
+	@echo ""
+	@echo "Lambda Deployment:"
+	@echo "  make deploy-create-stack      # Create Lambda stack (first time)"
+	@echo "  make deploy                   # Deploy to production Lambda"
+	@echo "  make deploy-logs              # View Lambda logs"
+	@echo "  make deploy-status            # Show stack status and outputs"
 
 # ============================================================================
 # Development Environment
@@ -129,35 +135,46 @@ clippy: ## Run clippy linter
 ci: fmt-check clippy test ## Run all CI checks (format, lint, test)
 
 # ============================================================================
-# Lambda Deployment
+# Lambda Deployment (AWS SAM + ECR)
 # ============================================================================
 
-build-lambda: ## Build Lambda deployment package
-	@echo "Building Lambda package..."
-	@mkdir -p bin
-	docker build -f docker/Dockerfile.lambda --target packager -t auth-manager:lambda-build ..
-	docker create --name auth-manager-lambda-temp auth-manager:lambda-build
-	docker cp auth-manager-lambda-temp:/package/lambda.zip bin/lambda.zip
-	docker rm auth-manager-lambda-temp
-	@echo "Lambda package created at: bin/lambda.zip"
-	@ls -lh bin/lambda.zip
+deploy-create-stack: ## Create Lambda infrastructure (first time only)
+	AWS_PROFILE=perso ./scripts/deploy-lambda.sh --create-stack
 
-push-s3: ## Push Lambda package to S3
-	@if [ ! -f bin/lambda.zip ]; then \
-		echo "Lambda package not found. Run 'make build-lambda' first."; \
-		exit 1; \
+deploy: ## Deploy to Lambda (build + push + update)
+	AWS_PROFILE=perso ./scripts/deploy-lambda.sh
+
+deploy-only: ## Update Lambda without rebuilding Docker image
+	AWS_PROFILE=perso ./scripts/deploy-lambda.sh --skip-build
+
+deploy-logs: ## View Lambda logs in real-time
+	AWS_PROFILE=perso sam logs -n auth-manager-prod --tail --region eu-central-1
+
+deploy-status: ## Show Lambda stack outputs and status
+	@echo "Stack Status:"
+	@AWS_PROFILE=perso aws cloudformation describe-stacks \
+		--stack-name auth-manager-prod \
+		--region eu-central-1 \
+		--query 'Stacks[0].StackStatus' \
+		--output text
+	@echo ""
+	@echo "Stack Outputs:"
+	@AWS_PROFILE=perso aws cloudformation describe-stacks \
+		--stack-name auth-manager-prod \
+		--region eu-central-1 \
+		--query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' \
+		--output table
+
+deploy-delete: ## Delete Lambda stack (WARNING: destroys all resources)
+	@echo "WARNING: This will delete the entire Lambda stack!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		AWS_PROFILE=perso sam delete --stack-name auth-manager-prod --region eu-central-1 --no-prompts; \
+		echo "Stack deleted!"; \
+	else \
+		echo "Cancelled."; \
 	fi
-	AWS_PROFILE=perso aws s3 cp bin/lambda.zip s3://dev-rickycst-sandbox/lambda.zip
-	@echo "Lambda package uploaded to S3"
-
-update-lambda: ## Update Lambda function code from S3
-	AWS_PROFILE=perso aws lambda update-function-code \
-		--function-name testrust \
-		--s3-bucket dev-rickycst-sandbox \
-		--s3-key lambda.zip
-	@echo "Lambda function updated"
-
-deploy-lambda: build-lambda push-s3 update-lambda ## Build and deploy Lambda (complete pipeline)
 
 # ============================================================================
 # Cleanup
