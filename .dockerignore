@@ -1,0 +1,43 @@
+# Build artifacts
+target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Version control
+.git/
+.github/
+.gitignore
+
+# Documentation (except README)
+*.md
+!README.md
+
+# Docker files
+docker/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# API testing
+postman/
+
+# Build outputs
+bin/
+
+# Secrets
+secrets/

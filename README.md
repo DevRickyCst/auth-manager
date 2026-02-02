@@ -1,262 +1,362 @@
-# auth-manager
+# Auth Manager
 
-Rust authentication service built on Axum, Tokio, Diesel (PostgreSQL), and JSON Web Tokens. It provides user authentication, password hashing, JWT generation/validation, and authorization primitives (roles/permissions). It targets both a local HTTP server and AWS Lambda via `lambda_http`.
+Service d'authentification production-ready en Rust, conçu pour fonctionner en local et sur AWS Lambda.
 
-## Project Overview
-- What it does:
-  - Exposes HTTP endpoints for authentication and authorization concerns.
-  - Hashes passwords with bcrypt.
-  - Issues and validates JWTs (ES256 via `jsonwebtoken` with `p256`).
-  - Encodes authorization logic (roles/permissions) in the service layer.
-  - Persists data in PostgreSQL through Diesel with `r2d2` pooling.
-- What it does not do:
-  - Provide a UI, email workflows, or OAuth/social logins.
-  - Implement unrelated business logic in HTTP handlers.
-  - Manage non-auth domain entities beyond what’s required for login, refresh, and identity.
+## Fonctionnalités
 
-## Architecture
-- HTTP Layer (Axum):
-  - Request/response DTOs in [src/dto](src/dto).
-  - Route handlers in [src/handlers](src/handlers) orchestrate services, perform validation, and map errors to HTTP responses.
-  - No business logic inside handlers; they delegate to the service layer.
-- Service Layer (Auth and domain services):
-  - Authentication flows, password checks, token issuing/validation in [src/auth](src/auth).
-  - JWT logic is centralized in [src/auth/jwt.rs](src/auth/jwt.rs) (key parsing, claims, signing, validation).
-  - Password hashing and verification in [src/auth/password.rs](src/auth/password.rs).
-- Persistence Layer (Diesel + r2d2):
-  - Database schema in [src/db/schema.rs](src/db/schema.rs) (generated from Diesel migrations).
-  - Data models in [src/db/models](src/db/models).
-  - Repositories in [src/db/repositories](src/db/repositories) encapsulate all DB access.
-  - Connection management and errors in [src/db](src/db).
-- Application wiring:
-  - Router and app setup in [src/app.rs](src/app.rs).
-  - Entrypoint(s) in [src/main.rs](src/main.rs).
-  - Error types in [src/error.rs](src/error.rs).
-  - Utilities, response helpers, and CORS/trace config in [src/utils](src/utils).
-- Observability:
-  - `tracing` + `tracing-subscriber` for structured logs.
-  - `tower-http` (trace, cors) for HTTP-level tracing and CORS.
+- ✅ Inscription et connexion utilisateur
+- ✅ Authentification JWT (HS256)
+- ✅ Tokens de rafraîchissement sécurisés (HttpOnly cookies)
+- ✅ Hachage de mots de passe avec bcrypt
+- ✅ Gestion des sessions et déconnexion
+- ✅ Changement de mot de passe
+- ✅ Validation des entrées
+- ✅ Gestion des tentatives de connexion
+- ✅ Support Docker et Docker Compose
+- ✅ Déploiement AWS Lambda
+- ✅ Base de données PostgreSQL avec Diesel ORM
 
-## API Documentation
-- Swagger UI (local only): browse at http://localhost:3000/swagger-ui
-- OpenAPI JSON: http://localhost:3000/api-doc/openapi.json
-- OpenAPI YAML: maintained in [openapi/openapi.yaml](openapi/openapi.yaml)
+## Prérequis
 
-Regenerate YAML quickly from the JSON (requires `yq`):
+- **Docker** et **Docker Compose** (recommandé)
+- **Rust** 1.92+ (si exécution locale sans Docker)
+- **PostgreSQL** 15+ (si exécution locale sans Docker)
+- **Make** (pour les commandes simplifiées)
+
+## Installation
+
+### 1. Cloner le projet
 
 ```bash
-curl -s http://localhost:3000/api-doc/openapi.json \
-  | yq -p=json -o=yaml > openapi/openapi.yaml
+git clone <repository-url>
+cd auth-manager
 ```
 
-Notes:
-- Swagger UI is mounted only when not running in AWS Lambda.
-- OpenAPI is defined via `utoipa` annotations in handlers and DTOs; aggregation lives in [src/docs.rs](src/docs.rs).
+### 2. Configuration
 
-## Execution Modes
-- Local HTTP Server:
-  - Runs a standard Axum server under Tokio.
-  - Suitable for development and local integration tests.
-- AWS Lambda:
-  - Uses `lambda_http` to serve Axum-compatible handlers in a serverless context.
-  - Deployable as a custom runtime (Amazon Linux 2) with a `bootstrap` executable.
+Copiez le fichier d'exemple et ajustez les variables d'environnement :
 
-## Project Structure
-- diesel.toml — Diesel CLI configuration.
-- migrations — Diesel migrations (initial setup, users, etc.).
-- src/
-  - app.rs — Router and middleware setup.
-  - main.rs — Entrypoint; selects execution mode and starts the app.
-  - error.rs — Application error types and mapping.
-  - auth/
-    - jwt.rs — JWT creation/validation (ES256), claims, keys.
-    - password.rs — bcrypt hashing/verification.
-    - services.rs — Authentication and authorization services.
-  - db/
-    - connection.rs — Pooling and connection setup.
-    - error.rs — DB-specific error mapping.
-    - schema.rs — Diesel `table!` definitions.
-    - models/ — Domain models (user, identity, tokens, login attempts).
-    - repositories/ — DB queries encapsulated behind repository APIs.
-  - dto/ — Request/response DTOs.
-  - handlers/ — Axum handlers (auth, user, etc.).
-  - utils/ — Response builders, helpers.
-- docker/ — Compose files and Dockerfile for local infra.
+```bash
+cp .env.example .env
+```
 
-## Configuration & Environment Variables
-Define configuration via environment variables. Typical setup:
+Variables importantes :
 
 ```env
-# App
-APP_ENV=development            # development|staging|production
-SERVER_HOST=127.0.0.1          # local mode only
-SERVER_PORT=8080               # local mode only
-RUST_LOG=info                  # tracing level
+# Configuration du serveur
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8080
+RUST_LOG=debug
 
-# Database (Diesel)
-DATABASE_URL=postgres://user:pass@localhost:5432/auth_manager
-DB_POOL_MAX_SIZE=15            # r2d2 pool size
+# Base de données
+DATABASE_URL=postgres://postgres:postgres@auth_db:5432/auth_db
+
+# JWT
+JWT_SECRET=votre_secret_jwt_ici
 
 # CORS
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE
-
-# JWT (ES256)
-JWT_ISSUER=auth-manager
-JWT_AUDIENCE=auth-manager-client
-JWT_ACCESS_TTL_MIN=15          # access token lifetime
-JWT_REFRESH_TTL_MIN=43200      # refresh token lifetime (e.g., 30 days)
-JWT_PRIVATE_KEY_PATH=./secrets/es256-private.pem
-JWT_PUBLIC_KEY_PATH=./secrets/es256-public.pem
-
-# Password hashing
-BCRYPT_COST=12                 # work factor; adjust per environment
 ```
 
-Notes:
-- Keys: ES256 requires a P-256 ECDSA key pair in PEM format. Store securely and mount via file paths or secrets manager.
-- Values may differ per environment; prefer production overrides via your deployment system.
-- Any additional variables should be documented alongside their module (e.g., see JWT module for claim details).
+### 3. Démarrer l'application
 
-## Database & Migrations (Diesel)
-- Ensure PostgreSQL is available and `DATABASE_URL` is set.
-- Install Diesel CLI if not already:
+#### Avec Docker (recommandé)
 
 ```bash
+# Démarrer les services (app + PostgreSQL)
+make local
+
+# Ou en arrière-plan
+make local-detached
+```
+
+L'application sera accessible sur `http://localhost:8080`
+
+#### Sans Docker
+
+```bash
+# Installer Diesel CLI
 cargo install diesel_cli --no-default-features --features postgres
-```
 
-- Initialize and run migrations:
-
-```bash
-diesel setup
+# Lancer les migrations
 diesel migration run
-```
 
-- Updating schema:
-  - After modifying migrations, regenerate schema into [src/db/schema.rs](src/db/schema.rs) as needed using `diesel print-schema` or the project’s workflow.
-- Keep queries inside repositories and avoid raw SQL in handlers/services.
-
-## Security Considerations
-- Passwords:
-  - Always store bcrypt hashes, never plaintext.
-  - Choose `BCRYPT_COST` appropriate to environment; benchmark and tune for production.
-- JWT:
-  - Use ES256 with strong, rotated keys; restrict access to private key.
-  - Validate `iss`, `aud`, `exp`, `iat`, and signature; reject tokens failing any checks.
-  - Keep JWT logic centralized in [src/auth/jwt.rs](src/auth/jwt.rs) for consistency.
-- Secrets Management:
-  - Do not commit keys or credentials; use environment-specific secret stores.
-  - Limit exposure via file mounts or env vars; prefer IAM/parameter stores in cloud.
-- CORS & HTTP:
-  - Restrict allowed origins/methods; avoid `*` in production.
-  - Use structured logging (`tracing`) and avoid leaking sensitive info in logs.
-
-## Running Locally
-Prerequisites: Rust (edition 2024 toolchain), PostgreSQL, Diesel CLI.
-
-1) Set environment variables (create `.env` or export in shell).
-2) Start PostgreSQL and run migrations.
-3) Run the server:
-
-```bash
+# Compiler et lancer
+cargo build --release
 cargo run
 ```
 
-- The service starts an Axum server using Tokio.
-- Use `RUST_LOG=debug` for more verbose traces during development.
+## API Endpoints
 
-### Docker Compose
-Use Make targets to run the full local stack (app + Postgres):
+### Santé
 
-```bash
-make local              # build and start containers
-make migrate            # run Diesel migrations inside the container
-make revert             # revert last migration
-make test               # run tests in a test runner container
+```http
+GET /health
 ```
 
-Once `make local` is up, visit Swagger UI at http://localhost:3000/swagger-ui and the health probe at http://localhost:3000/health.
+### Authentification
 
-## AWS Lambda: Build & Deploy
-Two options: manual packaging or using `cargo-lambda`.
+#### Inscription
+```http
+POST /auth/register
+Content-Type: application/json
 
-### Option A: Manual packaging (provided.al2)
-1) Build a static binary for Amazon Linux 2:
-
-```bash
-rustup target add x86_64-unknown-linux-musl
-cargo build --release --target x86_64-unknown-linux-musl
+{
+  "email": "user@example.com",
+  "username": "username",
+  "password": "SecurePass123!"
+}
 ```
 
-2) Prepare deployment artifact:
+#### Connexion
+```http
+POST /auth/login
+Content-Type: application/json
 
-```bash
-mkdir -p lambda
-cp target/x86_64-unknown-linux-musl/release/auth-manager lambda/bootstrap
-cd lambda
-zip -9r auth-manager.zip bootstrap
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
 ```
 
-3) Create a Lambda function:
-- Runtime: `provided.al2` (Custom runtime).
-- Upload `auth-manager.zip` as the function code.
-- Configure environment variables (see above) and IAM permissions.
-
-### Option B: cargo-lambda (optional CLI)
-Install and use [`cargo-lambda`](https://github.com/sigmaSd/cargo-lambda) for streamlined builds:
-
-```bash
-cargo install cargo-lambda
-cargo lambda build --release
-cargo lambda deploy --enable-function-url
+Réponse :
+```json
+{
+  "access_token": "eyJhbGc...",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "username": "username",
+    "created_at": "2024-01-01T00:00:00Z"
+  },
+  "expires_in": 3600
+}
 ```
 
-Adjust deploy flags according to your AWS setup. This project uses `lambda_http`, which `cargo-lambda` supports.
+Le refresh token est automatiquement stocké dans un cookie HttpOnly.
 
-## Development Guidelines
-- Handlers:
-  - Keep HTTP handlers thin; no business logic. Validate input, call services, map errors to responses.
-- Services:
-  - Centralize auth flows, permission checks, and JWT in `auth` modules.
-- Repositories:
-  - Encapsulate all DB access. Avoid leaking Diesel queries outside repositories.
-- Errors:
-  - Prefer explicit domain error types; use `anyhow` only at boundaries or for non-domain failures.
-- Concurrency:
-  - Avoid blocking operations in async contexts; use Tokio-aware libraries only.
-- Logging & Tracing:
-  - Use `tracing` macros (`info!`, `warn!`, `error!`, `instrument`) and configure `tracing-subscriber` per environment.
-- HTTP Middleware:
-  - Configure CORS and tracing via `tower-http`. Keep cross-cutting concerns at the router/middleware level.
-- Style & Quality:
-  - Format and lint:
-
-```bash
-cargo fmt
-cargo clippy --all-targets --all-features -- -D warnings
+#### Rafraîchir le token
+```http
+POST /auth/refresh
+Cookie: refresh_token=<hash>
 ```
 
-- Testing:
-  - Unit-test services and repositories; avoid coupling tests to handlers.
+#### Déconnexion
+```http
+POST /auth/logout
+Authorization: Bearer <access_token>
+```
 
-## Postman Collection
-- Import the collection at [postman/AuthManager.postman_collection.json](postman/AuthManager.postman_collection.json).
-- The collection scripts automatically store `access_token`, `refresh_token`, and `userId` on successful login/refresh and clear them on logout.
+### Utilisateurs
 
-## Endpoints Overview
-- Health: `GET /health`
-- Auth:
-  - `POST /auth/register`
-  - `POST /auth/login`
-  - `POST /auth/refresh`
-  - `POST /auth/logout`
-- Users:
-  - `GET /users/me`
-  - `GET /users/{id}`
-  - `DELETE /users/{id}`
-  - `POST /users/{id}/change-password`
+#### Obtenir l'utilisateur courant
+```http
+GET /users/me
+Authorization: Bearer <access_token>
+```
 
-## Notes
-- Verify runtime selection (local vs Lambda) in [src/main.rs](src/main.rs) and `docker/` files.
-- Keep secrets out of version control. Consider `.gitignore` for `target` and lock files as configured.
+#### Obtenir un utilisateur par ID
+```http
+GET /users/{id}
+Authorization: Bearer <access_token>
+```
+
+#### Changer le mot de passe
+```http
+POST /users/{id}/change-password
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "old_password": "OldPass123!",
+  "new_password": "NewPass456!"
+}
+```
+
+#### Supprimer un utilisateur
+```http
+DELETE /users/{id}
+Authorization: Bearer <access_token>
+```
+
+## Développement
+
+### Commandes Make
+
+```bash
+# Développement
+make local              # Démarrer l'environnement de développement
+make stop               # Arrêter tous les conteneurs
+make restart            # Redémarrer l'environnement
+
+# Base de données
+make migrate            # Appliquer les migrations
+make revert             # Annuler la dernière migration
+make db-shell           # Ouvrir un shell PostgreSQL
+make db-reset           # Réinitialiser la base de données
+
+# Tests
+make test               # Lancer tous les tests
+make test t=test_login  # Lancer un test spécifique
+make test-watch         # Tests en mode watch
+
+# Code Quality
+make fmt                # Formater le code
+make clippy             # Linter
+make ci                 # Vérifications CI (format + lint + tests)
+
+# Logs
+make logs               # Suivre tous les logs
+make logs-app           # Logs de l'application uniquement
+make logs-db            # Logs de la base de données
+
+# Shells
+make shell              # Shell dans le conteneur app
+make shell-test         # Shell dans le conteneur de tests
+```
+
+### Structure du projet
+
+```
+auth-manager/
+├── src/
+│   ├── api/                    # Types publics de l'API
+│   │   ├── requests.rs         # DTOs de requête
+│   │   ├── responses.rs        # DTOs de réponse
+│   │   ├── error.rs            # Format d'erreur
+│   │   └── result.rs           # Wrapper de réponse
+│   ├── auth/                   # Module d'authentification
+│   │   ├── jwt.rs              # Gestion JWT
+│   │   ├── password.rs         # Hachage bcrypt
+│   │   ├── services.rs         # Logique métier
+│   │   └── extractors.rs       # Extracteurs Axum
+│   ├── db/                     # Couche de persistance
+│   │   ├── models/             # Modèles Diesel
+│   │   ├── repositories/       # Accès base de données
+│   │   ├── schema.rs           # Schéma généré
+│   │   └── connection.rs       # Pool de connexions
+│   ├── handlers/               # Gestionnaires HTTP
+│   │   ├── auth.rs             # Routes d'auth
+│   │   ├── user.rs             # Routes utilisateur
+│   │   └── health.rs           # Santé
+│   ├── app.rs                  # Configuration du routeur
+│   ├── error.rs                # Types d'erreur
+│   └── main.rs                 # Point d'entrée
+├── migrations/                 # Migrations Diesel
+├── docker/                     # Fichiers Docker
+│   ├── Dockerfile              # Image de développement
+│   ├── Dockerfile.lambda       # Image Lambda optimisée
+│   ├── docker-compose.yml      # Stack de dev
+│   └── docker-compose.test.yml # Stack de tests
+├── postman/                    # Collection Postman
+├── .env.example                # Variables d'environnement exemple
+├── Cargo.toml                  # Dépendances Rust
+├── diesel.toml                 # Configuration Diesel
+├── makefile                    # Commandes simplifiées
+└── CLAUDE.md                   # Guide pour Claude Code
+```
+
+### Ajouter une migration
+
+```bash
+# Créer une nouvelle migration
+diesel migration generate nom_migration
+
+# Éditer les fichiers up.sql et down.sql dans migrations/
+
+# Appliquer la migration
+make migrate
+```
+
+### Tests
+
+Les tests sont exécutés dans un environnement Docker isolé avec une base de données de test dédiée :
+
+```bash
+# Tous les tests
+make test
+
+# Test spécifique
+make test t=test_register_success
+
+# Avec sortie détaillée
+make test t=test_name -- --nocapture
+```
+
+## Déploiement AWS Lambda
+
+### 1. Construire le package Lambda
+
+```bash
+make build-lambda
+```
+
+Cela crée un binaire statique optimisé dans `bin/lambda.zip`.
+
+### 2. Déployer sur AWS
+
+```bash
+# Upload vers S3
+make push-s3
+
+# Mettre à jour la fonction Lambda
+make update-lambda
+
+# Ou tout en une commande
+make deploy-lambda
+```
+
+### Configuration Lambda
+
+Variables d'environnement requises dans la fonction Lambda :
+
+```
+DATABASE_URL=postgres://...
+JWT_SECRET=...
+CORS_ALLOWED_ORIGINS=https://yourdomain.com
+BCRYPT_COST=12
+RUST_LOG=info
+```
+
+## Technologies
+
+- **[Rust](https://www.rust-lang.org/)** - Langage de programmation
+- **[Axum](https://github.com/tokio-rs/axum)** - Framework web
+- **[Tokio](https://tokio.rs/)** - Runtime asynchrone
+- **[Diesel](https://diesel.rs/)** - ORM et query builder
+- **[PostgreSQL](https://www.postgresql.org/)** - Base de données
+- **[jsonwebtoken](https://github.com/Keats/jsonwebtoken)** - JWT
+- **[bcrypt](https://github.com/Keats/rust-bcrypt)** - Hachage de mots de passe
+- **[lambda_http](https://github.com/awslabs/aws-lambda-rust-runtime)** - Runtime Lambda
+- **[Docker](https://www.docker.com/)** - Conteneurisation
+
+## Architecture
+
+Le projet suit une architecture en couches stricte :
+
+1. **Couche HTTP** (`handlers/`) - Gestionnaires de routes minimalistes
+2. **Couche Service** (`auth/services.rs`) - Logique métier
+3. **Couche Persistance** (`db/repositories/`) - Accès base de données
+
+Les responsabilités sont clairement séparées :
+- Les handlers ne contiennent aucune logique métier
+- Les services orchestrent la logique métier
+- Les repositories gèrent exclusivement l'accès aux données
+
+## Sécurité
+
+- Mots de passe hachés avec bcrypt (coût configurable)
+- Tokens JWT signés et avec expiration
+- Refresh tokens stockés sous forme de hash
+- Cookies HttpOnly pour les refresh tokens
+- CORS configurable
+- Validation des entrées
+- Pas de logs de données sensibles
+
+## Licence
+
+MIT
+
+## Support
+
+Pour toute question ou problème, ouvrez une issue sur le dépôt GitHub.
