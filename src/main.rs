@@ -1,10 +1,10 @@
 use std::env;
-mod app;
 mod api;
+mod app;
 mod auth;
 mod db;
-mod handlers;
 mod error;
+mod handlers;
 
 use tracing;
 
@@ -12,15 +12,13 @@ use app::build_router;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-
 pub async fn setup_logging() {
-    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| {
-            // Si RUST_LOG n'est pas défini, utiliser ces règles par défaut
-            tracing_subscriber::EnvFilter::new(
-                "info,auth_manager=debug,hyper_util=warn,tower_http=info"
-            )
-        });
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        // Si RUST_LOG n'est pas défini, utiliser ces règles par défaut
+        tracing_subscriber::EnvFilter::new(
+            "info,auth_manager=debug,hyper_util=warn,tower_http=info",
+        )
+    });
 
     tracing_subscriber::registry()
         .with(filter)

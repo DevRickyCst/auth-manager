@@ -1,32 +1,25 @@
-use crate::db::models::refresh_token::{RefreshToken, NewRefreshToken};
+use crate::db::connection::get_connection;
+use crate::db::error::{RepositoryError, map_diesel_error};
+use crate::db::models::refresh_token::{NewRefreshToken, RefreshToken};
 use crate::db::schema::refresh_tokens;
+use chrono::Utc;
 use diesel::prelude::*;
 use uuid::Uuid;
-use crate::db::connection::get_connection;
-use chrono::Utc;
-use crate::db::error::{map_diesel_error, RepositoryError};
 pub struct RefreshTokenRepository;
 
 impl RefreshTokenRepository {
+    pub fn create(new_refresh_token: &NewRefreshToken) -> Result<RefreshToken, RepositoryError> {
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-
-    pub fn create(new_refresh_token: &NewRefreshToken
-    ) -> Result<RefreshToken, RepositoryError> {
-        
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-        
-        
         diesel::insert_into(refresh_tokens::table)
             .values(new_refresh_token)
             .get_result::<RefreshToken>(&mut conn)
             .map_err(map_diesel_error)
-        }
+    }
 
     pub fn find_by_hash(hash: &str) -> Result<Option<RefreshToken>, RepositoryError> {
         let hash = hash.to_string();
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         refresh_tokens::table
             .filter(refresh_tokens::token_hash.eq(hash))
@@ -36,30 +29,26 @@ impl RefreshTokenRepository {
             .map_err(map_diesel_error)
     }
 
-
     pub fn delete(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         diesel::delete(refresh_tokens::table.filter(refresh_tokens::id.eq(id)))
             .execute(&mut conn)
             .map_err(map_diesel_error)?;
-        
+
         Ok(())
     }
 
     pub fn delete_by_user(user_id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         diesel::delete(refresh_tokens::table.filter(refresh_tokens::user_id.eq(user_id)))
             .execute(&mut conn)
             .map_err(map_diesel_error)?;
-        
+
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -74,8 +63,7 @@ mod tests {
             password_hash: Some("test_hash".to_string()),
         };
 
-        let user = UserRepository::create(&new_user)
-            .expect("Failed to create test user");
+        let user = UserRepository::create(&new_user).expect("Failed to create test user");
         user.id
     }
 
@@ -93,7 +81,7 @@ mod tests {
     #[test]
     fn test_create_refresh_token_success() {
         // Arrange
-        let user_id = create_test_user();  // ← Créer le user d'abord
+        let user_id = create_test_user(); // ← Créer le user d'abord
         let new_token = create_test_refresh_token(user_id);
 
         // Act
@@ -116,12 +104,11 @@ mod tests {
     #[test]
     fn test_find_by_hash_success() {
         // Arrange
-        let user_id = create_test_user();  // ← Créer le user
+        let user_id = create_test_user(); // ← Créer le user
         let new_token = create_test_refresh_token(user_id);
         let hash = new_token.token_hash.clone();
 
-        let created = RefreshTokenRepository::create(&new_token)
-            .expect("Failed to create token");
+        let created = RefreshTokenRepository::create(&new_token).expect("Failed to create token");
 
         // Act
         let result = RefreshTokenRepository::find_by_hash(&hash);
@@ -157,15 +144,15 @@ mod tests {
     #[test]
     fn test_find_by_hash_expired_token() {
         // Arrange
-        let user_id = create_test_user();  // ← Créer le user
+        let user_id = create_test_user(); // ← Créer le user
         let expired_token = NewRefreshToken {
             user_id,
             token_hash: format!("expired_hash_{}", Uuid::new_v4()),
-            expires_at: Utc::now() - chrono::Duration::hours(1),  // ← Expiré
+            expires_at: Utc::now() - chrono::Duration::hours(1), // ← Expiré
         };
 
-        let created = RefreshTokenRepository::create(&expired_token)
-            .expect("Failed to create token");
+        let created =
+            RefreshTokenRepository::create(&expired_token).expect("Failed to create token");
 
         // Act
         let result = RefreshTokenRepository::find_by_hash(&expired_token.token_hash);
@@ -186,11 +173,10 @@ mod tests {
     #[test]
     fn test_delete_by_id_success() {
         // Arrange
-        let user_id = create_test_user();  // ← Créer le user
+        let user_id = create_test_user(); // ← Créer le user
         let new_token = create_test_refresh_token(user_id);
-        
-        let created = RefreshTokenRepository::create(&new_token)
-            .expect("Failed to create token");
+
+        let created = RefreshTokenRepository::create(&new_token).expect("Failed to create token");
         let token_id = created.id;
 
         // Vérifier qu'il existe
@@ -206,8 +192,8 @@ mod tests {
         assert!(result.is_ok(), "Should delete successfully");
 
         // Vérifier qu'il n'existe plus
-        let after = RefreshTokenRepository::find_by_hash(&new_token.token_hash)
-            .expect("Failed to query");
+        let after =
+            RefreshTokenRepository::find_by_hash(&new_token.token_hash).expect("Failed to query");
         assert!(after.is_none(), "Token should be deleted");
 
         // Cleanup

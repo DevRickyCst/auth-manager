@@ -1,7 +1,7 @@
 use axum::extract::FromRequestParts;
 use axum::http::{header, request::Parts};
 
-use crate::auth::jwt::{JwtManager, Claims};
+use crate::auth::jwt::{Claims, JwtManager};
 use crate::error::AppError;
 
 /// Extracteur d'authentification pour les routes protégées.
@@ -18,7 +18,11 @@ pub struct AuthClaims {
 
 impl From<Claims> for AuthClaims {
     fn from(c: Claims) -> Self {
-        Self { sub: c.sub, iat: c.iat, exp: c.exp }
+        Self {
+            sub: c.sub,
+            iat: c.iat,
+            exp: c.exp,
+        }
     }
 }
 
@@ -26,14 +30,19 @@ impl From<Claims> for AuthClaims {
 impl FromRequestParts<JwtManager> for AuthClaims {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, jwt_manager: &JwtManager) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        jwt_manager: &JwtManager,
+    ) -> Result<Self, Self::Rejection> {
         // Récupère le header Authorization
         let auth_header = parts
             .headers
             .get(header::AUTHORIZATION)
             .ok_or_else(|| AppError::InvalidTokenFormat)?;
 
-        let auth_str = auth_header.to_str().map_err(|_| AppError::InvalidTokenFormat)?;
+        let auth_str = auth_header
+            .to_str()
+            .map_err(|_| AppError::InvalidTokenFormat)?;
 
         // Doit être de type Bearer
         const BEARER: &str = "Bearer ";

@@ -1,8 +1,8 @@
-use diesel::{Insertable, Queryable, Selectable, AsChangeset};
-use chrono::{DateTime, Utc};
 use crate::api::UserResponse;
-use uuid::Uuid;
 use crate::db::schema::users;
+use chrono::{DateTime, Utc};
+use diesel::{AsChangeset, Insertable, Queryable, Selectable};
+use uuid::Uuid;
 
 #[derive(Insertable, Debug, Clone)]
 #[diesel(table_name = users)]

@@ -58,4 +58,8 @@ diesel::joinable!(refresh_tokens -> users (user_id));
 diesel::joinable!(user_identities -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    login_attempts,refresh_tokens,user_identities,users,);
+    login_attempts,
+    refresh_tokens,
+    user_identities,
+    users,
+);

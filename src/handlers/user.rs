@@ -1,14 +1,13 @@
-
 use axum::{
-    extract::{Extension, Path},
     Json,
+    extract::{Extension, Path},
 };
 use uuid::Uuid;
 
-use crate::auth::services::AuthService;
-use crate::api::{ChangePasswordRequest, UserResponse, AppResponse};
-use crate::error::AppError;
+use crate::api::{AppResponse, ChangePasswordRequest, UserResponse};
 use crate::auth::extractors::AuthClaims;
+use crate::auth::services::AuthService;
+use crate::error::AppError;
 use std::sync::Arc;
 
 /// GET /users/me
@@ -41,13 +40,14 @@ pub async fn delete_user(
 ) -> Result<AppResponse<()>, AppError> {
     // Vérifier que l'utilisateur supprime son propre compte
     if claims.sub != user_id {
-        return Err(AppError::unauthorized("You can only delete your own account"));
+        return Err(AppError::unauthorized(
+            "You can only delete your own account",
+        ));
     }
 
     service.delete_user(user_id)?;
     Ok(AppResponse::no_content())
 }
-
 
 /// POST /users/:id/change-password
 /// Change le mot de passe de l'utilisateur
@@ -59,7 +59,9 @@ pub async fn change_password(
 ) -> Result<AppResponse<serde_json::Value>, AppError> {
     // Vérifier que l'utilisateur change son propre password
     if claims.sub != user_id {
-        return Err(AppError::unauthorized("You can only change your own password"));
+        return Err(AppError::unauthorized(
+            "You can only change your own password",
+        ));
     }
 
     service.change_password(user_id, &payload.old_password, &payload.new_password)?;

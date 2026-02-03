@@ -1,17 +1,17 @@
 // src/auth/services.rs
 
 use crate::api::{
-    UserResponse, LoginResponse, RefreshTokenResponse,
-    RegisterRequest, LoginRequest, RefreshTokenRequest,
+    LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
+    UserResponse,
 };
 use crate::error::AppError;
 
-use crate::db::models::user::NewUser;
 use crate::db::models::refresh_token::NewRefreshToken;
+use crate::db::models::user::NewUser;
 
-use crate::db::repositories::user_repository::UserRepository;
-use crate::db::repositories::refresh_token_repository::RefreshTokenRepository;
 use crate::db::repositories::login_attempt_repository::LoginAttemptRepository;
+use crate::db::repositories::refresh_token_repository::RefreshTokenRepository;
+use crate::db::repositories::user_repository::UserRepository;
 
 use chrono::Utc;
 
@@ -33,8 +33,10 @@ impl AuthService {
 
     /// Déconnexion: révoque tous les refresh tokens de l'utilisateur
     pub fn logout(&self, user_id: uuid::Uuid) -> Result<(), AppError> {
-        crate::db::repositories::refresh_token_repository::RefreshTokenRepository::delete_by_user(user_id)
-            .map_err(AppError::from)?;
+        crate::db::repositories::refresh_token_repository::RefreshTokenRepository::delete_by_user(
+            user_id,
+        )
+        .map_err(AppError::from)?;
         Ok(())
     }
 
@@ -59,7 +61,6 @@ impl AuthService {
         old_password: &str,
         new_password: &str,
     ) -> Result<(), AppError> {
-    
         // Vérifie que le nouveau password est fort
         if !Self::is_strong_password(new_password) {
             return Err(AppError::WeakPassword(
@@ -150,9 +151,10 @@ impl AuthService {
         };
 
         // Vérifie le password
-        let password_hash = user.password_hash.as_ref().ok_or_else(|| {
-            AppError::database("Password not set for user")
-        })?;
+        let password_hash = user
+            .password_hash
+            .as_ref()
+            .ok_or_else(|| AppError::database("Password not set for user"))?;
 
         if !super::password::PasswordManager::verify(&login_request.password, password_hash)
             .map_err(|e| AppError::hashing_failed(e))?
@@ -226,9 +228,8 @@ impl AuthService {
 
         // Crée un nouveau refresh token
         let new_refresh_token_str = uuid::Uuid::new_v4().to_string();
-        let new_refresh_token_hash =
-            super::password::PasswordManager::hash(&new_refresh_token_str)
-                .map_err(|e| AppError::hashing_failed(e))?;
+        let new_refresh_token_hash = super::password::PasswordManager::hash(&new_refresh_token_str)
+            .map_err(|e| AppError::hashing_failed(e))?;
 
         let new_refresh_token = NewRefreshToken {
             user_id: old_token.user_id,
@@ -261,9 +262,9 @@ impl AuthService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::password::PasswordManager;
     use crate::db::models::user::NewUser;
     use crate::db::repositories::user_repository::UserRepository;
-    use crate::auth::password::PasswordManager;
 
     fn create_test_register_request() -> RegisterRequest {
         let unique = uuid::Uuid::new_v4();
@@ -292,10 +293,9 @@ mod tests {
             username: "testuser".to_string(),
             password: "TestPassword123!".to_string(),
         };
-        
+
         let result: Result<UserResponse, AppError> = AuthService::register(register_request);
         assert!(result.is_err());
-
     }
 
     #[test]
@@ -306,16 +306,15 @@ mod tests {
             username: "testuser".to_string(),
             password: "weak".to_string(),
         };
-        
+
         let result = AuthService::register(register_request);
         assert!(result.is_err());
-        
     }
 
     #[test]
     fn test_register_duplicate_email() {
         let register_request = create_test_register_request();
-        
+
         // Première inscription
         let result1 = AuthService::register(register_request.clone())
             .expect("First registration should succeed");
@@ -334,8 +333,7 @@ mod tests {
         let email = register_request.email.clone();
         let password = register_request.password.clone();
 
-        AuthService::register(register_request)
-            .expect("Registration should succeed");
+        AuthService::register(register_request).expect("Registration should succeed");
 
         let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key");
         let auth_service = AuthService::new(jwt_manager);
@@ -345,9 +343,9 @@ mod tests {
             password,
         };
 
-        let (login_response, _refresh_hash) =
-            auth_service.login(login_request, None)
-                .expect("Login should succeed");
+        let (login_response, _refresh_hash) = auth_service
+            .login(login_request, None)
+            .expect("Login should succeed");
 
         assert_eq!(login_response.user.email, email);
 

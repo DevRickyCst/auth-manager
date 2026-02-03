@@ -1,8 +1,7 @@
-use diesel::{Insertable, Queryable, Selectable};
-use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use crate::db::schema::login_attempts;
-
+use chrono::{DateTime, Utc};
+use diesel::{Insertable, Queryable, Selectable};
+use uuid::Uuid;
 
 #[derive(Insertable, Debug, Clone)]
 #[diesel(table_name = login_attempts)]

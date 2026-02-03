@@ -135,6 +135,19 @@ clippy: ## Run clippy linter
 ci: fmt-check clippy test ## Run all CI checks (format, lint, test)
 
 # ============================================================================
+# Local Build & Run (without Docker)
+# ============================================================================
+
+build: ## Build the project locally
+	cargo build --release
+
+run: ## Run the project locally (requires PostgreSQL and .env)
+	cargo run
+
+dev: ## Run with cargo-watch for hot reload
+	cargo watch -x run
+
+# ============================================================================
 # Lambda Deployment (AWS SAM + ECR)
 # ============================================================================
 

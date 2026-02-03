@@ -1,23 +1,21 @@
 // src/app.rs
 
 use axum::{
+    Router,
     extract::Extension,
     routing::{delete, get, post},
-    Router,
 };
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
- 
 
-use crate::auth::services::AuthService;
 use crate::auth::jwt::JwtManager;
-use crate::handlers::auth::{login, register, refresh_token, logout};
-use crate::handlers::user::{get_current_user, get_user_by_id, delete_user, change_password};
+use crate::auth::services::AuthService;
+use crate::handlers::auth::{login, logout, refresh_token, register};
 use crate::handlers::health::health;
+use crate::handlers::user::{change_password, delete_user, get_current_user, get_user_by_id};
 
 /// Configure les routes d'authentification
 pub fn auth_routes(jwt_manager: JwtManager) -> Router {
-
     let auth_service = Arc::new(AuthService::new(jwt_manager.clone()));
 
     // Public endpoints (state: AuthService)
@@ -39,8 +37,8 @@ pub fn auth_routes(jwt_manager: JwtManager) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::{Request, StatusCode};
     use axum::body::Body;
+    use axum::http::{Request, StatusCode};
     use lambda_http::tower::ServiceExt; // for oneshot
 
     fn test_jwt() -> JwtManager {
@@ -67,9 +65,9 @@ mod tests {
         let jwt = test_jwt();
 
         // Create a user to generate a token
+        use crate::auth::password::PasswordManager;
         use crate::db::models::user::NewUser;
         use crate::db::repositories::user_repository::UserRepository;
-        use crate::auth::password::PasswordManager;
 
         let hash = PasswordManager::hash("OldPass123!").expect("hash");
         let new_user = NewUser {

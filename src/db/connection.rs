@@ -1,16 +1,14 @@
-use super::{DbPool, DbConnection};
-use diesel::r2d2::ConnectionManager;
+use super::{DbConnection, DbPool};
+use anyhow::{Result, anyhow};
 use diesel::PgConnection;
-use anyhow::{anyhow, Result};
+use diesel::r2d2::ConnectionManager;
 use once_cell::sync::Lazy;
 
-
 pub static DB_POOL: Lazy<DbPool> = Lazy::new(|| {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
     let manager = ConnectionManager::<PgConnection>::new(&database_url);
-    
+
     diesel::r2d2::Pool::builder()
         .max_size(5)
         .build(manager)
@@ -18,7 +16,8 @@ pub static DB_POOL: Lazy<DbPool> = Lazy::new(|| {
 });
 
 pub fn get_connection() -> Result<DbConnection> {
-    DB_POOL.get()
+    DB_POOL
+        .get()
         .map_err(|e| anyhow!("Impossible de récupérer une connexion du pool: {}", e))
 }
 
@@ -27,8 +26,7 @@ pub fn get_connection() -> Result<DbConnection> {
 // ============================================
 #[cfg(test)]
 pub fn create_pool() -> Result<DbPool> {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let manager = ConnectionManager::<PgConnection>::new(&database_url);
 
@@ -46,7 +44,7 @@ mod tests {
     fn test_get_connection_success() {
         // Le pool Lazy est créé automatiquement à la première utilisation
         let result = get_connection();
-        
+
         // Soit success soit error (dépend si BDD est up)
         // Mais le pool structure doit être bon
         match result {
@@ -65,7 +63,7 @@ mod tests {
         let _conn1 = get_connection();
         let _conn2 = get_connection();
         let _conn3 = get_connection();
-        
+
         // Le pool est le même (Lazy ne crée qu'une fois)
         // Aucune erreur, ça compile et fonctionne
         assert!(true);
@@ -74,7 +72,7 @@ mod tests {
     #[test]
     fn test_pool_max_size() {
         let result = get_connection();
-        
+
         match result {
             Ok(_conn) => {
                 // Pool créé, check max_size
@@ -91,8 +89,11 @@ mod tests {
     fn test_create_pool_manual() {
         // Alternative: créer le pool manuellement (moins courant)
         let result = create_pool();
-        assert!(result.is_ok(), "Pool creation should succeed with valid DATABASE_URL");
-        
+        assert!(
+            result.is_ok(),
+            "Pool creation should succeed with valid DATABASE_URL"
+        );
+
         let pool = result.unwrap();
         assert_eq!(pool.max_size(), 5, "Pool max_size should be 5");
     }
