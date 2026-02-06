@@ -34,6 +34,32 @@ pub fn auth_routes(jwt_manager: JwtManager) -> Router {
     public.merge(protected)
 }
 
+/// Configure les routes utilisateur (exemple)
+pub fn user_routes(jwt_manager: JwtManager) -> Router {
+    // Service pour les handlers
+    let auth_service = Arc::new(AuthService::new(jwt_manager.clone()));
+
+    Router::new()
+        .route("/me", get(get_current_user))
+        .route("/{id}", get(get_user_by_id))
+        .route("/{id}", delete(delete_user))
+        .route("/{id}/change-password", post(change_password))
+        // Fournit JwtManager en state pour l'extracteur AuthClaims
+        .with_state(jwt_manager)
+        // Fournit le service en extension pour les handlers
+        .layer(Extension(auth_service))
+}
+
+/// Construit l'application complète
+pub fn build_router(jwt_manager: JwtManager) -> Router {
+    Router::new()
+        .route("/health", get(health))
+        .nest("/auth", auth_routes(jwt_manager.clone()))
+        .nest("/users", user_routes(jwt_manager))
+        // Middleware global de tracing
+        .layer(TraceLayer::new_for_http())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,32 +118,4 @@ mod tests {
 
         let _ = UserRepository::delete(user.id);
     }
-}
-
-/// Configure les routes utilisateur (exemple)
-pub fn user_routes(jwt_manager: JwtManager) -> Router {
-    // Service pour les handlers
-    let auth_service = Arc::new(AuthService::new(jwt_manager.clone()));
-
-    Router::new()
-        .route("/me", get(get_current_user))
-        .route("/{id}", get(get_user_by_id))
-        .route("/{id}", delete(delete_user))
-        .route("/{id}/change-password", post(change_password))
-        // Fournit JwtManager en state pour l'extracteur AuthClaims
-        .with_state(jwt_manager)
-        // Fournit le service en extension pour les handlers
-        .layer(Extension(auth_service))
-}
-
-/// Construit l'application complète
-pub fn build_router(jwt_manager: JwtManager) -> Router {
-    let router = Router::new()
-        .route("/health", get(health))
-        .nest("/auth", auth_routes(jwt_manager.clone()))
-        .nest("/users", user_routes(jwt_manager))
-        // Middleware global de tracing
-        .layer(TraceLayer::new_for_http());
-
-    router
 }

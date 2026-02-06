@@ -38,7 +38,7 @@ impl FromRequestParts<JwtManager> for AuthClaims {
         let auth_header = parts
             .headers
             .get(header::AUTHORIZATION)
-            .ok_or_else(|| AppError::InvalidTokenFormat)?;
+            .ok_or(AppError::InvalidTokenFormat)?;
 
         let auth_str = auth_header
             .to_str()

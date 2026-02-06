@@ -66,7 +66,6 @@ mod tests {
 
         // Le pool est le même (Lazy ne crée qu'une fois)
         // Aucune erreur, ça compile et fonctionne
-        assert!(true);
     }
 
     #[test]

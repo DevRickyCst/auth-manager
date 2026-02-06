@@ -6,8 +6,6 @@ mod db;
 mod error;
 mod handlers;
 
-use tracing;
-
 use app::build_router;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
