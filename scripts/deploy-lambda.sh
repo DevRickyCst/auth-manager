@@ -145,8 +145,7 @@ build_and_push_image() {
 update_lambda_image() {
     print_header "Updating Lambda Function Image"
 
-    local function_name="${STACK_NAME#auth-manager-}"
-    function_name="auth-manager-prod"
+    local function_name="$STACK_NAME"
 
     local ecr_uri=$(get_ecr_repository_uri)
     if [ -z "$ecr_uri" ]; then
@@ -283,7 +282,7 @@ Deploy Auth Manager to AWS Lambda using SAM
 
 OPTIONS:
     -s, --stack-name NAME     CloudFormation stack name [default: auth-manager-prod]
-    -r, --region REGION       AWS region [default: us-east-1]
+    -r, --region REGION       AWS region [default: eu-central-1]
     -p, --profile PROFILE     AWS CLI profile [default: default]
     --create-stack            Create new SAM stack (deploys infrastructure)
     --skip-build              Skip Docker build and push

@@ -7,10 +7,9 @@ mod error;
 mod handlers;
 
 use app::build_router;
-use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-pub async fn setup_logging() {
+pub fn setup_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         // Si RUST_LOG n'est pas défini, utiliser ces règles par défaut
         tracing_subscriber::EnvFilter::new(
@@ -29,7 +28,7 @@ pub async fn setup_logging() {
 #[tokio::main]
 async fn main() -> Result<(), lambda_http::Error> {
     // Initialize logging for all environments
-    setup_logging().await;
+    setup_logging();
     tracing::info!("Starting auth-manager...");
 
     let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| {
@@ -46,7 +45,6 @@ async fn main() -> Result<(), lambda_http::Error> {
     } else {
         tracing::info!("Running in local HTTP server mode");
         let addr = "0.0.0.0:3000";
-        let app = app.layer(TraceLayer::new_for_http());
         let listener = tokio::net::TcpListener::bind(addr).await?;
         tracing::info!("🚀 Server running at http://{}", addr);
         axum::serve(listener, app).await?;

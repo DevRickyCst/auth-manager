@@ -44,15 +44,20 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ### AWS Lambda Deployment
 ```bash
-# Build Lambda package (creates bin/lambda.zip)
-make build-lambda
+# Create Lambda infrastructure (first time only)
+make deploy-create-stack
 
-# Push to S3 and update Lambda function
-make push-s3
-make update-lambda
+# Complete deployment pipeline (build + push + update)
+make deploy
 
-# Complete deployment pipeline
-make deploy-lambda
+# Update Lambda without rebuilding Docker image
+make deploy-only
+
+# View Lambda logs in real-time
+make deploy-logs
+
+# Show Lambda stack outputs and status
+make deploy-status
 ```
 
 ### Database Operations

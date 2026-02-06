@@ -45,7 +45,7 @@ Variables importantes :
 ```env
 # Configuration du serveur
 SERVER_HOST=0.0.0.0
-SERVER_PORT=8080
+SERVER_PORT=3000
 RUST_LOG=debug
 
 # Base de données
@@ -70,7 +70,7 @@ make local
 make local-detached
 ```
 
-L'application sera accessible sur `http://localhost:8080`
+L'application sera accessible sur `http://localhost:3000`
 
 #### Sans Docker
 
@@ -285,25 +285,27 @@ make test t=test_name -- --nocapture
 
 ## Déploiement AWS Lambda
 
-### 1. Construire le package Lambda
+### 1. Premier déploiement (création de l'infrastructure)
 
 ```bash
-make build-lambda
+# Crée le stack CloudFormation avec ECR, Lambda, API Gateway
+make deploy-create-stack
 ```
 
-Cela crée un binaire statique optimisé dans `bin/lambda.zip`.
-
-### 2. Déployer sur AWS
+### 2. Déploiements suivants
 
 ```bash
-# Upload vers S3
-make push-s3
+# Déploiement complet (build + push + update)
+make deploy
 
-# Mettre à jour la fonction Lambda
-make update-lambda
+# Mise à jour sans rebuild (si l'image existe déjà)
+make deploy-only
 
-# Ou tout en une commande
-make deploy-lambda
+# Voir les logs Lambda en temps réel
+make deploy-logs
+
+# Afficher le statut du stack
+make deploy-status
 ```
 
 ### Configuration Lambda
