@@ -1,18 +1,16 @@
 use crate::db::connection::get_connection;
-use crate::db::models::user::{User, NewUser};
+use crate::db::error::{RepositoryError, map_diesel_error};
+use crate::db::models::user::{NewUser, User};
+use crate::db::schema::users;
 use diesel::prelude::*;
 use uuid::Uuid;
-use crate::db::schema::users;
-use crate::db::error::{RepositoryError, map_diesel_error};
 
 pub struct UserRepository;
 
 impl UserRepository {
-
     pub fn find_by_email(email: &str) -> Result<Option<User>, RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-        
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         users::table
             .filter(users::email.eq(email))
             .first::<User>(&mut *conn)
@@ -22,9 +20,8 @@ impl UserRepository {
 
     /// Trouver un utilisateur par ID
     pub fn find_by_id(id: Uuid) -> Result<Option<User>, RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-        
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         users::table
             .filter(users::id.eq(id))
             .first::<User>(&mut conn)
@@ -34,9 +31,8 @@ impl UserRepository {
 
     /// Créer un nouvel utilisateur
     pub fn create(new_user: &NewUser) -> Result<User, RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-        
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         diesel::insert_into(users::table)
             .values(new_user)
             .get_result::<User>(&mut conn)
@@ -45,44 +41,39 @@ impl UserRepository {
 
     /// Mettre à jour le dernier login
     pub fn update_last_login(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-        
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         diesel::update(users::table.filter(users::id.eq(id)))
             .set(users::last_login_at.eq(chrono::Utc::now()))
             .execute(&mut conn)
             .map_err(map_diesel_error)?;
-        
+
         Ok(())
     }
 
     // Mettre à jour le mot de passe
     pub fn update_password(id: Uuid, new_password_hash: &str) -> Result<(), RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         diesel::update(users::table.filter(users::id.eq(id)))
             .set(users::password_hash.eq(new_password_hash))
             .execute(&mut conn)
             .map_err(map_diesel_error)?;
-        
+
         Ok(())
     }
 
     /// Supprimer un utilisateur
     pub fn delete(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection()
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-        
+        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         diesel::delete(users::table.filter(users::id.eq(id)))
             .execute(&mut conn)
             .map_err(map_diesel_error)?;
-        
+
         Ok(())
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -91,7 +82,11 @@ mod tests {
 
     fn create_test_user(suffix: &str) -> NewUser {
         NewUser {
-            email: format!("test_{}_{:?}@example.com", suffix, std::time::SystemTime::now()),
+            email: format!(
+                "test_{}_{:?}@example.com",
+                suffix,
+                std::time::SystemTime::now()
+            ),
             username: format!("testuser_{}", suffix),
             password_hash: Some("test_hash".to_string()),
         }
@@ -141,7 +136,10 @@ mod tests {
     fn test_find_by_email_not_found() {
         let result = UserRepository::find_by_email("nonexistent_email_12345@example.com");
 
-        assert!(result.is_ok(), "Query should succeed even if user not found");
+        assert!(
+            result.is_ok(),
+            "Query should succeed even if user not found"
+        );
         let found = result.unwrap();
         assert!(found.is_none(), "User should not exist");
     }
@@ -174,7 +172,10 @@ mod tests {
 
         let result = UserRepository::find_by_id(random_id);
 
-        assert!(result.is_ok(), "Query should succeed even if user not found");
+        assert!(
+            result.is_ok(),
+            "Query should succeed even if user not found"
+        );
         let found = result.unwrap();
         assert!(found.is_none(), "User should not exist");
     }
@@ -191,7 +192,10 @@ mod tests {
         let before = UserRepository::find_by_id(user_id)
             .expect("Should find user")
             .expect("User should exist");
-        assert!(before.last_login_at.is_none(), "last_login_at should be None initially");
+        assert!(
+            before.last_login_at.is_none(),
+            "last_login_at should be None initially"
+        );
 
         let result = UserRepository::update_last_login(user_id);
 
@@ -227,7 +231,10 @@ mod tests {
 
         let result = UserRepository::create(&user2);
 
-        assert!(result.is_err(), "Should fail due to unique constraint on email");
+        assert!(
+            result.is_err(),
+            "Should fail due to unique constraint on email"
+        );
 
         // Cleanup
         let _ = UserRepository::delete(created1.id);

@@ -1,19 +1,18 @@
 // src/handlers/auth.rs
 
-use axum::{
-    http::{HeaderMap, HeaderValue},
-    Json,
-};
-use axum::extract::{State, Extension};
-use std::sync::Arc;
-use crate::auth::services::AuthService;
 use crate::api::{
-    LoginRequest, RegisterRequest, RefreshTokenRequest,
-    RefreshTokenResponse, UserResponse, PublicLoginResponse,
-    AppResponse,
+    AppResponse, LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse,
+    RegisterRequest, UserResponse,
 };
-use crate::error::AppError;
 use crate::auth::extractors::AuthClaims;
+use crate::auth::services::AuthService;
+use crate::error::AppError;
+use axum::extract::{Extension, State};
+use axum::{
+    Json,
+    http::{HeaderMap, HeaderValue},
+};
+use std::sync::Arc;
 
 /// POST /auth/register
 /// Inscription d'un nouvel utilisateur
@@ -47,7 +46,8 @@ pub async fn login(
     let mut out_headers = HeaderMap::new();
     out_headers.insert(
         axum::http::header::SET_COOKIE,
-        HeaderValue::from_str(&cookie_val).map_err(|_| AppError::internal("Failed to set cookie"))?,
+        HeaderValue::from_str(&cookie_val)
+            .map_err(|_| AppError::internal("Failed to set cookie"))?,
     );
 
     let public = PublicLoginResponse::from(response);
@@ -78,7 +78,9 @@ pub async fn refresh_token(
         .next()
         .ok_or_else(|| AppError::validation("Missing refresh_token cookie"))?;
 
-    let response = auth_service.refresh_token(RefreshTokenRequest { refresh_token: refresh_hash })?;
+    let response = auth_service.refresh_token(RefreshTokenRequest {
+        refresh_token: refresh_hash,
+    })?;
     Ok(AppResponse::ok(response))
 }
 

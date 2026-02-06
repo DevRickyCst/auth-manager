@@ -1,12 +1,12 @@
 // src/error.rs
 
-use std::fmt;
+use crate::api::ErrorResponse;
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
-use crate::api::ErrorResponse;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum AppError {
@@ -106,20 +106,12 @@ impl AppError {
     fn get_error_info(&self) -> (StatusCode, &'static str, String, Option<String>) {
         match self {
             // 404 Not Found
-            AppError::NotFound(msg) => (
-                StatusCode::NOT_FOUND,
-                "NOT_FOUND",
-                msg.clone(),
-                None,
-            ),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone(), None),
 
             // 409 Conflict
-            AppError::Duplicate(msg) => (
-                StatusCode::CONFLICT,
-                "DUPLICATE_ENTRY",
-                msg.clone(),
-                None,
-            ),
+            AppError::Duplicate(msg) => {
+                (StatusCode::CONFLICT, "DUPLICATE_ENTRY", msg.clone(), None)
+            }
             AppError::UserAlreadyExists => (
                 StatusCode::CONFLICT,
                 "USER_EXISTS",
@@ -140,12 +132,9 @@ impl AppError {
                 "Invalid refresh token".to_string(),
                 None,
             ),
-            AppError::UnauthorizedAction(msg) => (
-                StatusCode::UNAUTHORIZED,
-                "UNAUTHORIZED",
-                msg.clone(),
-                None,
-            ),
+            AppError::UnauthorizedAction(msg) => {
+                (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone(), None)
+            }
 
             // 400 Bad Request
             AppError::RefreshTokenExpired => (
@@ -160,12 +149,9 @@ impl AppError {
                 "Invalid email format".to_string(),
                 None,
             ),
-            AppError::WeakPassword(msg) => (
-                StatusCode::BAD_REQUEST,
-                "WEAK_PASSWORD",
-                msg.clone(),
-                None,
-            ),
+            AppError::WeakPassword(msg) => {
+                (StatusCode::BAD_REQUEST, "WEAK_PASSWORD", msg.clone(), None)
+            }
             AppError::ValidationError(msg) => (
                 StatusCode::BAD_REQUEST,
                 "VALIDATION_ERROR",
@@ -178,12 +164,9 @@ impl AppError {
                 format!("Missing required field: {}", field),
                 None,
             ),
-            AppError::InvalidInput(msg) => (
-                StatusCode::BAD_REQUEST,
-                "INVALID_INPUT",
-                msg.clone(),
-                None,
-            ),
+            AppError::InvalidInput(msg) => {
+                (StatusCode::BAD_REQUEST, "INVALID_INPUT", msg.clone(), None)
+            }
             AppError::InvalidTokenFormat => (
                 StatusCode::BAD_REQUEST,
                 "INVALID_TOKEN_FORMAT",
@@ -200,12 +183,9 @@ impl AppError {
             ),
 
             // 423 Locked
-            AppError::ResourceLocked(msg) => (
-                StatusCode::LOCKED,
-                "RESOURCE_LOCKED",
-                msg.clone(),
-                None,
-            ),
+            AppError::ResourceLocked(msg) => {
+                (StatusCode::LOCKED, "RESOURCE_LOCKED", msg.clone(), None)
+            }
 
             // 500 Internal Server Error
             AppError::PasswordHashingFailed(msg) => (
@@ -307,9 +287,7 @@ impl From<crate::db::error::RepositoryError> for AppError {
             crate::db::error::RepositoryError::Duplicate => {
                 AppError::duplicate("Resource already exists")
             }
-            crate::db::error::RepositoryError::Database(msg) => {
-                AppError::database(msg)
-            }
+            crate::db::error::RepositoryError::Database(msg) => AppError::database(msg),
         }
     }
 }

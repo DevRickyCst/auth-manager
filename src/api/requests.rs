@@ -5,13 +5,13 @@ use serde::Deserialize;
 pub struct RegisterRequest {
     pub email: String,
     pub username: String,
-    pub password: String,  // Plain text
+    pub password: String, // Plain text
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct LoginRequest {
     pub email: String,
-    pub password: String,  // Plain text
+    pub password: String, // Plain text
 }
 
 #[derive(Deserialize, Debug, Clone)]

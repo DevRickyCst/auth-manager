@@ -1,11 +1,11 @@
-version: "3.9"
-
 services:
   auth-manager:
-    build: 
-      context: .
-      dockerfile: Dockerfile
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: development
     platform: linux/amd64
+    container_name: auth-manager-app
     ports:
       - "3000:3000"
     working_dir: /app
@@ -13,24 +13,54 @@ services:
       - ../:/app
       - target:/app/target
       - cargo:/usr/local/cargo/registry
-    environment:
-      DATABASE_URL: "postgres://postgres:postgres@auth_db:5432/auth_db"
+    env_file:
+      - ../.env
     depends_on:
-      - auth_db
+      auth_db:
+        condition: service_healthy
     command: cargo watch -x run
+    networks:
+      - auth-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORY_LIMIT:-1G}
+        reservations:
+          memory: ${APP_MEMORY_RESERVATION:-512M}
 
   auth_db:
     image: postgres:17-alpine
     container_name: auth-manager-db
-    restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-auth_db}
+    expose:
+      - "5432"
     ports:
       - "5432:5432"
     volumes:
       - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - auth-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-auth_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEMORY_LIMIT:-512M}
+        reservations:
+          memory: ${DB_MEMORY_RESERVATION:-256M}
+
+networks:
+  auth-network:
+    driver: bridge
 
 volumes:
   target:

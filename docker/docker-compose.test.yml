@@ -1,27 +1,65 @@
 services:
   auth-db-test:
     image: postgres:17-alpine
+    container_name: auth-manager-db-test
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: auth_test_db
+      POSTGRES_USER: ${TEST_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${TEST_POSTGRES_DB:-auth_test_db}
+    expose:
+      - "5432"
     ports:
       - "5433:5432"
+    # Use tmpfs for in-memory database (50-70% faster tests)
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER:-postgres} -d ${TEST_POSTGRES_DB:-auth_test_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: ${TEST_DB_MEMORY_LIMIT:-256M}
+        reservations:
+          memory: ${TEST_DB_MEMORY_RESERVATION:-128M}
 
   test-runner:
     build:
       context: ..
-      dockerfile: docker/Dockerfile # Utilise ton Dockerfile avec diesel_cli
+      dockerfile: docker/Dockerfile
+      target: development
     platform: linux/amd64
+    container_name: auth-manager-test-runner
     working_dir: /app
     volumes:
       - ../:/app
       - target_test:/app/target
       - cargo_test:/usr/local/cargo/registry
+    env_file:
+      - ../.env
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@auth-db-test:5432/auth_test_db
+      - DATABASE_URL=${TEST_DATABASE_URL:-postgres://postgres:postgres@auth-db-test:5432/auth_test_db}
+      - RUST_BACKTRACE=1
     depends_on:
-      - auth-db-test
+      auth-db-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    deploy:
+      resources:
+        limits:
+          memory: ${TEST_APP_MEMORY_LIMIT:-512M}
+        reservations:
+          memory: ${TEST_APP_MEMORY_RESERVATION:-256M}
+
+networks:
+  test-network:
+    driver: bridge
 
 volumes:
   target_test:

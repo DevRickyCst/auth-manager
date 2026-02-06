@@ -22,7 +22,9 @@ impl std::error::Error for RepositoryError {}
 pub fn map_diesel_error(e: DieselError) -> RepositoryError {
     match e {
         DieselError::NotFound => RepositoryError::NotFound,
-        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => RepositoryError::Duplicate,
+        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
+            RepositoryError::Duplicate
+        }
         other => RepositoryError::Database(other.to_string()),
     }
 }
