@@ -4,19 +4,34 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# API types (shared with frontend)
+auth-manager-api = { path = "auth-manager-api", version = "0.1.0" }
+
+# Web framework
 axum = "0.8.8"
 lambda_http = "1.0.2"
-serde = "1.0.228"
-serde_json = "1.0.149"
 tokio = { version = "1.49.0", features = ["full"] }
-hyper = { version = "1.8.1", features = ["full"] } 
-tracing-subscriber = "0.3.20"
+hyper = { version = "1.8.1", features = ["full"] }
 tower-http = { version = "0.6.8", features = ["trace", "cors"] }
-tracing = "0.1.44"
+
+# Serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# Database
 diesel = { version = "2.2.12", features = ["postgres", "r2d2", "uuid", "chrono"] }
+
+# Utilities
 uuid = { version = "1.19.0", features = ["v4", "serde"] }
-bcrypt = "0.18.0"
 chrono = { version = "0.4.43", features = ["serde"] }
-anyhow = "1.0.100"
+
+# Authentication & Security
+bcrypt = "0.18.0"
 jsonwebtoken = { version = "10.2.0", features = ["p256", "rust_crypto"] }
-# Utoipa removed
+
+# Error handling
+anyhow = "1.0.100"
+
+# Logging
+tracing = "0.1.44"
+tracing-subscriber = "0.3.20"

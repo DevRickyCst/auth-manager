@@ -1,4 +1,4 @@
-use crate::api::AppResponse;
+use crate::response::AppResponse;
 
 /// GET /health
 /// Simple healthcheck endpoint

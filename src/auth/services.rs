@@ -1,10 +1,10 @@
 // src/auth/services.rs
 
-use crate::api::{
+use crate::error::AppError;
+use auth_manager_api::{
     LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
     UserResponse,
 };
-use crate::error::AppError;
 
 use crate::db::models::refresh_token::NewRefreshToken;
 use crate::db::models::user::NewUser;

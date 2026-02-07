@@ -1,0 +1,16 @@
+[package]
+name = "auth-manager-api"
+version = "0.1.0"
+edition = "2024"
+authors = ["DevRickyCst"]
+description = "Shared API types for auth-manager - WASM-compatible"
+license = "MIT"
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+uuid = { version = "1.19.0", features = ["v4", "serde", "js"] }
+chrono = { version = "0.4.43", features = ["serde", "wasmbind"] }

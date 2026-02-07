@@ -1,5 +1,5 @@
-use crate::api::UserResponse;
 use crate::db::schema::users;
+use auth_manager_api::UserResponse;
 use chrono::{DateTime, Utc};
 use diesel::{AsChangeset, Insertable, Queryable, Selectable};
 use uuid::Uuid;
