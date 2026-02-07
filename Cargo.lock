@@ -59,6 +59,7 @@ name = "auth-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "auth-manager-api",
  "axum",
  "bcrypt",
  "chrono",
@@ -72,6 +73,16 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "auth-manager-api"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
  "uuid",
 ]
 

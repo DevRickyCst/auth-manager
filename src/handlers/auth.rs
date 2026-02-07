@@ -1,12 +1,13 @@
 // src/handlers/auth.rs
 
-use crate::api::{
-    AppResponse, LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse,
-    RegisterRequest, UserResponse,
-};
 use crate::auth::extractors::AuthClaims;
 use crate::auth::services::AuthService;
 use crate::error::AppError;
+use crate::response::AppResponse;
+use auth_manager_api::{
+    LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
+    UserResponse,
+};
 use axum::extract::{Extension, State};
 use axum::{
     Json,

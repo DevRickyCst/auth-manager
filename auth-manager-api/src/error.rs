@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-/// Response d'erreur publique de l'API
+/// Public API error response format
 #[derive(Debug, Serialize, Clone)]
 pub struct ErrorResponse {
     pub error: String,

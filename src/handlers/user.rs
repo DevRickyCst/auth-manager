@@ -4,10 +4,11 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::{AppResponse, ChangePasswordRequest, UserResponse};
 use crate::auth::extractors::AuthClaims;
 use crate::auth::services::AuthService;
 use crate::error::AppError;
+use crate::response::AppResponse;
+use auth_manager_api::{ChangePasswordRequest, UserResponse};
 use std::sync::Arc;
 
 /// GET /users/me

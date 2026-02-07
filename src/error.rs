@@ -1,6 +1,6 @@
 // src/error.rs
 
-use crate::api::ErrorResponse;
+use auth_manager_api::ErrorResponse;
 use axum::{
     Json,
     http::StatusCode,
