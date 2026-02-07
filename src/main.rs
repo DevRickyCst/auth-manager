@@ -31,6 +31,10 @@ async fn main() -> Result<(), lambda_http::Error> {
     setup_logging();
     tracing::info!("Starting auth-manager...");
 
+    // Initialize database connection pool
+    db::connection::init_pool().expect("Failed to initialize database connection pool");
+    tracing::info!("Database connection pool initialized");
+
     let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| {
         tracing::warn!("JWT_SECRET not set, using default (NOT FOR PRODUCTION!)");
         "default_secret".to_string()

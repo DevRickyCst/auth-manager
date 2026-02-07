@@ -86,7 +86,12 @@ db-shell: ## Open PostgreSQL shell
 # Testing
 # ============================================================================
 
-test: ## Run all tests
+test: ## Run tests in dev container (fast, recommended)
+	@echo "🧪 Running tests in dev container..."
+	@docker exec auth-manager-app cargo test $(t) -- --test-threads=1
+
+test-isolated: ## Run tests in isolated container (slow, more memory)
+	@echo "🧪 Running tests in isolated test container..."
 	$(COMPOSE_TEST) run --rm test-runner bash -c "diesel database setup && cargo test $(t) -- --test-threads=5"
 	@$(MAKE) test-cleanup
 

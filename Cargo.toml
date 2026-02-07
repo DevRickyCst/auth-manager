@@ -18,6 +18,5 @@ uuid = { version = "1.19.0", features = ["v4", "serde"] }
 bcrypt = "0.18.0"
 chrono = { version = "0.4.43", features = ["serde"] }
 anyhow = "1.0.100"
-once_cell = "1.21.3"
 jsonwebtoken = { version = "10.2.0", features = ["p256", "rust_crypto"] }
 # Utoipa removed

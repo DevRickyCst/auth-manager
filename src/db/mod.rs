@@ -3,6 +3,7 @@ pub mod error;
 pub mod models;
 pub mod repositories;
 pub mod schema;
+
 use diesel::PgConnection;
 use diesel::r2d2::{self, ConnectionManager};
 

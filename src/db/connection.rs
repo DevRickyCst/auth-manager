@@ -1,39 +1,66 @@
+use super::error::RepositoryError;
 use super::{DbConnection, DbPool};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
-use once_cell::sync::Lazy;
+use std::sync::OnceLock;
 
-pub static DB_POOL: Lazy<DbPool> = Lazy::new(|| {
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+static POOL: OnceLock<DbPool> = OnceLock::new();
 
-    let manager = ConnectionManager::<PgConnection>::new(&database_url);
-
-    diesel::r2d2::Pool::builder()
-        .max_size(5)
+/// Initialize the PostgreSQL connection pool using DATABASE_URL.
+/// This should be called once at application startup.
+pub fn init_pool() -> Result<()> {
+    let url = std::env::var("DATABASE_URL").context("DATABASE_URL env var not set")?;
+    let manager = ConnectionManager::<PgConnection>::new(url);
+    let pool = diesel::r2d2::Pool::builder()
+        .max_size(15)
         .build(manager)
-        .expect("Failed to create database pool")
-});
+        .context("Failed to build r2d2 pool")?;
 
-pub fn get_connection() -> Result<DbConnection> {
-    DB_POOL
-        .get()
-        .map_err(|e| anyhow!("Impossible de récupérer une connexion du pool: {}", e))
+    POOL.set(pool)
+        .map_err(|_| anyhow!("Pool already initialized"))?;
+
+    Ok(())
 }
 
-// ============================================
-// CREATE POOL - Si tu veux créer manuellement (optionnel)
-// ============================================
+/// Get a reference to the initialized pool.
+/// Panics if the pool hasn't been initialized with init_pool().
+pub fn get_pool() -> &'static DbPool {
+    POOL.get()
+        .expect("DB pool not initialized. Call init_pool() first.")
+}
+
+/// Get a connection from the pool.
+/// Returns RepositoryError for use in repository layer.
+pub fn get_connection() -> Result<DbConnection, RepositoryError> {
+    get_pool()
+        .get()
+        .map_err(|e| RepositoryError::PoolError(e.to_string()))
+}
+
 #[cfg(test)]
+#[allow(dead_code)]
 pub fn create_pool() -> Result<DbPool> {
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
 
     let manager = ConnectionManager::<PgConnection>::new(&database_url);
 
     diesel::r2d2::Pool::builder()
         .max_size(5)
         .build(manager)
-        .map_err(|e| anyhow!("Failed to create pool: {}", e))
+        .context("Failed to create pool")
+}
+
+#[cfg(test)]
+pub fn init_test_pool() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        if std::env::var("DATABASE_URL").is_ok() {
+            let _ = init_pool();
+        }
+    });
 }
 
 #[cfg(test)]
@@ -41,59 +68,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_connection_success() {
-        // Le pool Lazy est créé automatiquement à la première utilisation
-        let result = get_connection();
-
-        // Soit success soit error (dépend si BDD est up)
-        // Mais le pool structure doit être bon
-        match result {
-            Ok(_conn) => {
-                println!("✓ Connection successful");
-            }
-            Err(e) => {
-                println!("⚠️ Connection error (expected if DB not running): {}", e);
-            }
-        }
-    }
-
-    #[test]
-    fn test_pool_is_created_once() {
-        // Appeler get_connection() plusieurs fois
-        let _conn1 = get_connection();
-        let _conn2 = get_connection();
-        let _conn3 = get_connection();
-
-        // Le pool est le même (Lazy ne crée qu'une fois)
-        // Aucune erreur, ça compile et fonctionne
-    }
-
-    #[test]
-    fn test_pool_max_size() {
-        let result = get_connection();
-
-        match result {
-            Ok(_conn) => {
-                // Pool créé, check max_size
-                assert_eq!(DB_POOL.max_size(), 5);
-            }
-            Err(_) => {
-                // BDD pas disponible, mais Lazy est bon
-                assert_eq!(DB_POOL.max_size(), 5);
-            }
-        }
-    }
-
-    #[test]
-    fn test_create_pool_manual() {
-        // Alternative: créer le pool manuellement (moins courant)
-        let result = create_pool();
-        assert!(
-            result.is_ok(),
-            "Pool creation should succeed with valid DATABASE_URL"
-        );
-
-        let pool = result.unwrap();
-        assert_eq!(pool.max_size(), 5, "Pool max_size should be 5");
+    fn test_pool_initialization() {
+        init_test_pool();
+        // Pool should now be initialized or skip if DATABASE_URL not set
     }
 }

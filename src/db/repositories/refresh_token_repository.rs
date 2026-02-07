@@ -1,5 +1,5 @@
 use crate::db::connection::get_connection;
-use crate::db::error::{RepositoryError, map_diesel_error};
+use crate::db::error::RepositoryError;
 use crate::db::models::refresh_token::{NewRefreshToken, RefreshToken};
 use crate::db::schema::refresh_tokens;
 use chrono::Utc;
@@ -9,42 +9,40 @@ pub struct RefreshTokenRepository;
 
 impl RefreshTokenRepository {
     pub fn create(new_refresh_token: &NewRefreshToken) -> Result<RefreshToken, RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::insert_into(refresh_tokens::table)
             .values(new_refresh_token)
             .get_result::<RefreshToken>(&mut conn)
-            .map_err(map_diesel_error)
+            .map_err(Into::into)
     }
 
     pub fn find_by_hash(hash: &str) -> Result<Option<RefreshToken>, RepositoryError> {
         let hash = hash.to_string();
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         refresh_tokens::table
             .filter(refresh_tokens::token_hash.eq(hash))
             .filter(refresh_tokens::expires_at.gt(Utc::now()))
             .first::<RefreshToken>(&mut conn)
             .optional()
-            .map_err(map_diesel_error)
+            .map_err(Into::into)
     }
 
     pub fn delete(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::delete(refresh_tokens::table.filter(refresh_tokens::id.eq(id)))
-            .execute(&mut conn)
-            .map_err(map_diesel_error)?;
+            .execute(&mut conn)?;
 
         Ok(())
     }
 
     pub fn delete_by_user(user_id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::delete(refresh_tokens::table.filter(refresh_tokens::user_id.eq(user_id)))
-            .execute(&mut conn)
-            .map_err(map_diesel_error)?;
+            .execute(&mut conn)?;
 
         Ok(())
     }
@@ -53,10 +51,13 @@ impl RefreshTokenRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::connection::init_test_pool;
     use crate::db::models::user::NewUser;
     use crate::db::repositories::user_repository::UserRepository;
 
     fn create_test_user() -> Uuid {
+        init_test_pool();
+
         let new_user = NewUser {
             email: format!("test_{}@example.com", Uuid::new_v4()),
             username: format!("testuser_{}", Uuid::new_v4()),
