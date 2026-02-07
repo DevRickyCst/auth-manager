@@ -2,6 +2,8 @@
 
 Service d'authentification production-ready en Rust, conçu pour fonctionner en local et sur AWS Lambda.
 
+**Architecture multi-crate** : Le projet inclut un crate API (`auth-manager-api`) WASM-compatible pour partager les types entre backend et frontend.
+
 ## Fonctionnalités
 
 - ✅ Inscription et connexion utilisateur
@@ -15,6 +17,7 @@ Service d'authentification production-ready en Rust, conçu pour fonctionner en 
 - ✅ Support Docker et Docker Compose
 - ✅ Déploiement AWS Lambda
 - ✅ Base de données PostgreSQL avec Diesel ORM
+- ✅ API types WASM-compatible pour intégration frontend
 
 ## Prérequis
 
@@ -205,6 +208,11 @@ make fmt                # Formater le code
 make clippy             # Linter
 make ci                 # Vérifications CI (format + lint + tests)
 
+# API Crate
+cargo test -p auth-manager-api                      # Tests du crate API
+cargo build --manifest-path auth-manager-api/Cargo.toml \
+  --target wasm32-unknown-unknown --release         # Build WASM
+
 # Logs
 make logs               # Suivre tous les logs
 make logs-app           # Logs de l'application uniquement
@@ -219,12 +227,18 @@ make shell-test         # Shell dans le conteneur de tests
 
 ```
 auth-manager/
-├── src/
-│   ├── api/                    # Types publics de l'API
-│   │   ├── requests.rs         # DTOs de requête
-│   │   ├── responses.rs        # DTOs de réponse
-│   │   ├── error.rs            # Format d'erreur
-│   │   └── result.rs           # Wrapper de réponse
+├── Cargo.toml                  # Backend package
+├── auth-manager-api/           # 🎯 API types crate (WASM-compatible)
+│   ├── Cargo.toml              # Dépendances minimales
+│   ├── README.md               # Documentation du crate
+│   └── src/
+│       ├── lib.rs              # Exports publics
+│       ├── requests.rs         # DTOs de requête
+│       ├── responses.rs        # DTOs de réponse
+│       ├── error.rs            # Format d'erreur
+│       └── result.rs           # Wrapper de réponse
+├── src/                        # Backend code
+│   ├── response.rs             # Wrapper Axum pour API types
 │   ├── auth/                   # Module d'authentification
 │   │   ├── jwt.rs              # Gestion JWT
 │   │   ├── password.rs         # Hachage bcrypt
@@ -250,7 +264,6 @@ auth-manager/
 │   └── docker-compose.test.yml # Stack de tests
 ├── postman/                    # Collection Postman
 ├── .env.example                # Variables d'environnement exemple
-├── Cargo.toml                  # Dépendances Rust
 ├── diesel.toml                 # Configuration Diesel
 ├── makefile                    # Commandes simplifiées
 └── CLAUDE.md                   # Guide pour Claude Code
@@ -322,6 +335,8 @@ RUST_LOG=info
 
 ## Technologies
 
+### Backend (`auth-manager`)
+
 - **[Rust](https://www.rust-lang.org/)** - Langage de programmation
 - **[Axum](https://github.com/tokio-rs/axum)** - Framework web
 - **[Tokio](https://tokio.rs/)** - Runtime asynchrone
@@ -332,18 +347,112 @@ RUST_LOG=info
 - **[lambda_http](https://github.com/awslabs/aws-lambda-rust-runtime)** - Runtime Lambda
 - **[Docker](https://www.docker.com/)** - Conteneurisation
 
+### API Types (`auth-manager-api`)
+
+- **[Serde](https://serde.rs/)** - Sérialisation/désérialisation
+- **[UUID](https://github.com/uuid-rs/uuid)** - Identifiants uniques
+- **[Chrono](https://github.com/chronotope/chrono)** - Gestion des dates
+- **WASM-compatible** - Peut être compilé pour wasm32-unknown-unknown
+
 ## Architecture
 
-Le projet suit une architecture en couches stricte :
+Le projet suit une **architecture multi-crate en couches strictes** :
 
-1. **Couche HTTP** (`handlers/`) - Gestionnaires de routes minimalistes
-2. **Couche Service** (`auth/services.rs`) - Logique métier
-3. **Couche Persistance** (`db/repositories/`) - Accès base de données
+### Structure Multi-Crate
 
-Les responsabilités sont clairement séparées :
-- Les handlers ne contiennent aucune logique métier
-- Les services orchestrent la logique métier
-- Les repositories gèrent exclusivement l'accès aux données
+1. **`auth-manager-api`** (Crate WASM-compatible)
+   - Types publics partagés entre backend et frontend
+   - Dépendances minimales : serde, uuid, chrono uniquement
+   - Peut être importé dans des applications WASM
+
+2. **`auth-manager`** (Backend)
+   - Serveur HTTP/Lambda avec Axum
+   - Utilise `auth-manager-api` pour les types
+   - Contient toute la logique métier et persistance
+
+### Couches Backend
+
+1. **Couche API Types** (`auth-manager-api` crate)
+   - Request/Response DTOs
+   - Format d'erreur
+   - Wrapper de réponse générique
+
+2. **Couche HTTP** (`src/handlers/`, `src/response.rs`)
+   - Gestionnaires de routes minimalistes
+   - Wrapper Axum pour les types API
+   - Mapping d'erreurs vers HTTP
+
+3. **Couche Service** (`src/auth/services.rs`)
+   - Logique métier et validation
+   - Orchestration JWT et mots de passe
+   - Coordination entre repositories
+
+4. **Couche Persistance** (`src/db/repositories/`)
+   - Accès base de données exclusif
+   - Queries Diesel isolées
+   - Pool de connexions
+
+### Séparation des Responsabilités
+
+- Les **handlers** ne contiennent aucune logique métier
+- Les **services** orchestrent toute la logique métier
+- Les **repositories** gèrent exclusivement l'accès aux données
+- Les **types API** sont indépendants du backend
+
+## Intégration Frontend
+
+Le crate `auth-manager-api` peut être utilisé dans des applications frontend Rust/WASM pour une communication type-safe avec l'API.
+
+### Installation
+
+Dans le `Cargo.toml` de votre frontend :
+
+```toml
+[dependencies]
+auth-manager-api = { path = "../auth-manager/auth-manager-api" }
+```
+
+### Ce que le frontend reçoit
+
+**Inclus** ✅ :
+- Request DTOs : `RegisterRequest`, `LoginRequest`, `RefreshTokenRequest`, etc.
+- Response DTOs : `UserResponse`, `LoginResponse`, `RefreshTokenResponse`, etc.
+- Format d'erreur : `ErrorResponse`
+- Dépendances légères : serde, uuid, chrono
+
+**Exclu** ❌ :
+- Axum (framework web)
+- Diesel (ORM)
+- Tokio (runtime async)
+- Toute dépendance serveur
+
+### Exemple d'utilisation
+
+```rust
+use auth_manager_api::{LoginRequest, LoginResponse};
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub async fn login(email: String, password: String) -> Result<JsValue, JsValue> {
+    let request = LoginRequest { email, password };
+
+    // Envoyer au backend via HTTP...
+    let response: LoginResponse = fetch_json("/auth/login", request).await?;
+
+    Ok(serde_wasm_bindgen::to_value(&response)?)
+}
+```
+
+### Build WASM
+
+```bash
+# Installer la target WASM
+rustup target add wasm32-unknown-unknown
+
+# Vérifier la compatibilité
+cd auth-manager-api
+cargo build --target wasm32-unknown-unknown --release
+```
 
 ## Sécurité
 
