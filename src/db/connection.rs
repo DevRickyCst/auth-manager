@@ -1,6 +1,6 @@
-use super::{DbConnection, DbPool};
 use super::error::RepositoryError;
-use anyhow::{Result, anyhow, Context};
+use super::{DbConnection, DbPool};
+use anyhow::{Context, Result, anyhow};
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use std::sync::OnceLock;
@@ -26,7 +26,8 @@ pub fn init_pool() -> Result<()> {
 /// Get a reference to the initialized pool.
 /// Panics if the pool hasn't been initialized with init_pool().
 pub fn get_pool() -> &'static DbPool {
-    POOL.get().expect("DB pool not initialized. Call init_pool() first.")
+    POOL.get()
+        .expect("DB pool not initialized. Call init_pool() first.")
 }
 
 /// Get a connection from the pool.
@@ -38,9 +39,9 @@ pub fn get_connection() -> Result<DbConnection, RepositoryError> {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub fn create_pool() -> Result<DbPool> {
-    let database_url = std::env::var("DATABASE_URL")
-        .context("DATABASE_URL must be set")?;
+    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
 
     let manager = ConnectionManager::<PgConnection>::new(&database_url);
 

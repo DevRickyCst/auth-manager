@@ -65,8 +65,7 @@ impl UserRepository {
     pub fn delete(id: Uuid) -> Result<(), RepositoryError> {
         let mut conn = get_connection()?;
 
-        diesel::delete(users::table.filter(users::id.eq(id)))
-            .execute(&mut conn)?;
+        diesel::delete(users::table.filter(users::id.eq(id))).execute(&mut conn)?;
 
         Ok(())
     }

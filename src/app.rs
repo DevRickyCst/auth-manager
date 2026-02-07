@@ -63,10 +63,10 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::connection::init_test_pool;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use lambda_http::tower::ServiceExt; // for oneshot
-    use crate::db::connection::init_test_pool;
 
     fn test_jwt() -> JwtManager {
         init_test_pool();

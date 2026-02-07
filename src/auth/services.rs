@@ -263,9 +263,9 @@ impl AuthService {
 mod tests {
     use super::*;
     use crate::auth::password::PasswordManager;
+    use crate::db::connection::init_test_pool;
     use crate::db::models::user::NewUser;
     use crate::db::repositories::user_repository::UserRepository;
-    use crate::db::connection::init_test_pool;
 
     fn create_test_register_request() -> RegisterRequest {
         init_test_pool();

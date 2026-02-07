@@ -3,28 +3,25 @@ use std::fmt;
 /// Repository layer errors
 #[derive(Debug)]
 pub enum RepositoryError {
-    QueryError(String),
     PoolError(String),
     NotFound(String),
     UniqueViolation(String),
     ForeignKeyViolation(String),
     DatabaseError(String),
-    // Legacy aliases for backward compatibility
-    Duplicate,
-    Database(String),
 }
 
 impl fmt::Display for RepositoryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RepositoryError::QueryError(msg) => write!(f, "Query error: {}", msg),
             RepositoryError::PoolError(msg) => write!(f, "Connection pool error: {}", msg),
             RepositoryError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            RepositoryError::UniqueViolation(msg) => write!(f, "Unique constraint violation: {}", msg),
-            RepositoryError::ForeignKeyViolation(msg) => write!(f, "Foreign key constraint violation: {}", msg),
+            RepositoryError::UniqueViolation(msg) => {
+                write!(f, "Unique constraint violation: {}", msg)
+            }
+            RepositoryError::ForeignKeyViolation(msg) => {
+                write!(f, "Foreign key constraint violation: {}", msg)
+            }
             RepositoryError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            RepositoryError::Duplicate => write!(f, "Duplicate entry"),
-            RepositoryError::Database(msg) => write!(f, "Database error: {}", msg),
         }
     }
 }
@@ -41,7 +38,9 @@ impl From<diesel::result::Error> for RepositoryError {
                 let message = info.message().to_string();
                 match kind {
                     DatabaseErrorKind::UniqueViolation => RepositoryError::UniqueViolation(message),
-                    DatabaseErrorKind::ForeignKeyViolation => RepositoryError::ForeignKeyViolation(message),
+                    DatabaseErrorKind::ForeignKeyViolation => {
+                        RepositoryError::ForeignKeyViolation(message)
+                    }
                     _ => RepositoryError::DatabaseError(message),
                 }
             }
@@ -59,9 +58,3 @@ impl From<diesel::r2d2::PoolError> for RepositoryError {
 // Note: This implementation is redundant with std::error::Error
 // Anyhow already provides From<E> for any E: std::error::Error
 // We rely on that blanket implementation instead of defining our own
-
-/// Legacy helper function for mapping Diesel errors
-/// Prefer using .into() or ? operator with the From impl instead
-pub fn map_diesel_error(e: diesel::result::Error) -> RepositoryError {
-    e.into()
-}

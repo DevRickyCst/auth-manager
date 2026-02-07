@@ -51,9 +51,9 @@ impl RefreshTokenRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::connection::init_test_pool;
     use crate::db::models::user::NewUser;
     use crate::db::repositories::user_repository::UserRepository;
-    use crate::db::connection::init_test_pool;
 
     fn create_test_user() -> Uuid {
         init_test_pool();
