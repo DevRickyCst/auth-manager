@@ -1,5 +1,5 @@
 use crate::db::connection::get_connection;
-use crate::db::error::{RepositoryError, map_diesel_error};
+use crate::db::error::RepositoryError;
 use crate::db::models::user::{NewUser, User};
 use crate::db::schema::users;
 use diesel::prelude::*;
@@ -9,67 +9,64 @@ pub struct UserRepository;
 
 impl UserRepository {
     pub fn find_by_email(email: &str) -> Result<Option<User>, RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         users::table
             .filter(users::email.eq(email))
             .first::<User>(&mut *conn)
             .optional()
-            .map_err(map_diesel_error)
+            .map_err(Into::into)
     }
 
     /// Trouver un utilisateur par ID
     pub fn find_by_id(id: Uuid) -> Result<Option<User>, RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         users::table
             .filter(users::id.eq(id))
             .first::<User>(&mut conn)
             .optional()
-            .map_err(map_diesel_error)
+            .map_err(Into::into)
     }
 
     /// Créer un nouvel utilisateur
     pub fn create(new_user: &NewUser) -> Result<User, RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::insert_into(users::table)
             .values(new_user)
             .get_result::<User>(&mut conn)
-            .map_err(map_diesel_error)
+            .map_err(Into::into)
     }
 
     /// Mettre à jour le dernier login
     pub fn update_last_login(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::update(users::table.filter(users::id.eq(id)))
             .set(users::last_login_at.eq(chrono::Utc::now()))
-            .execute(&mut conn)
-            .map_err(map_diesel_error)?;
+            .execute(&mut conn)?;
 
         Ok(())
     }
 
     // Mettre à jour le mot de passe
     pub fn update_password(id: Uuid, new_password_hash: &str) -> Result<(), RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::update(users::table.filter(users::id.eq(id)))
             .set(users::password_hash.eq(new_password_hash))
-            .execute(&mut conn)
-            .map_err(map_diesel_error)?;
+            .execute(&mut conn)?;
 
         Ok(())
     }
 
     /// Supprimer un utilisateur
     pub fn delete(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection().map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let mut conn = get_connection()?;
 
         diesel::delete(users::table.filter(users::id.eq(id)))
-            .execute(&mut conn)
-            .map_err(map_diesel_error)?;
+            .execute(&mut conn)?;
 
         Ok(())
     }
@@ -79,8 +76,11 @@ impl UserRepository {
 mod tests {
     use super::*;
     use crate::auth::password::PasswordManager;
+    use crate::db::connection::init_test_pool;
 
     fn create_test_user(suffix: &str) -> NewUser {
+        init_test_pool();
+
         NewUser {
             email: format!(
                 "test_{}_{:?}@example.com",
@@ -134,6 +134,7 @@ mod tests {
     // ============================================
     #[test]
     fn test_find_by_email_not_found() {
+        init_test_pool();
         let result = UserRepository::find_by_email("nonexistent_email_12345@example.com");
 
         assert!(
@@ -168,6 +169,7 @@ mod tests {
     // ============================================
     #[test]
     fn test_find_by_id_not_found() {
+        init_test_pool();
         let random_id = Uuid::new_v4();
 
         let result = UserRepository::find_by_id(random_id);
@@ -215,6 +217,7 @@ mod tests {
     // ============================================
     #[test]
     fn test_create_duplicate_email_fails() {
+        init_test_pool();
         let email = format!("duplicate_{}@example.com", Uuid::new_v4());
         let user1 = NewUser {
             email: email.clone(),
@@ -245,6 +248,7 @@ mod tests {
     // ============================================
     #[test]
     fn test_update_password_success() {
+        init_test_pool();
         let new_user = NewUser {
             email: format!("update_pw_{}@example.com", Uuid::new_v4()),
             username: "update_pw_user".to_string(),

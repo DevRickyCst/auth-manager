@@ -281,13 +281,20 @@ impl AppError {
 impl From<crate::db::error::RepositoryError> for AppError {
     fn from(err: crate::db::error::RepositoryError) -> Self {
         match err {
-            crate::db::error::RepositoryError::NotFound => {
-                AppError::not_found("Resource not found")
+            crate::db::error::RepositoryError::NotFound(msg) => {
+                AppError::not_found(&msg)
             }
             crate::db::error::RepositoryError::Duplicate => {
                 AppError::duplicate("Resource already exists")
             }
             crate::db::error::RepositoryError::Database(msg) => AppError::database(msg),
+            crate::db::error::RepositoryError::UniqueViolation(msg) => {
+                AppError::duplicate(&msg)
+            }
+            crate::db::error::RepositoryError::QueryError(msg) => AppError::database(&msg),
+            crate::db::error::RepositoryError::PoolError(msg) => AppError::database(&msg),
+            crate::db::error::RepositoryError::ForeignKeyViolation(msg) => AppError::database(&msg),
+            crate::db::error::RepositoryError::DatabaseError(msg) => AppError::database(&msg),
         }
     }
 }

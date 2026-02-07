@@ -66,8 +66,10 @@ mod tests {
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use lambda_http::tower::ServiceExt; // for oneshot
+    use crate::db::connection::init_test_pool;
 
     fn test_jwt() -> JwtManager {
+        init_test_pool();
         JwtManager::new("test_secret_for_auth_routes")
     }
 

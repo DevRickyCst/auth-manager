@@ -265,8 +265,11 @@ mod tests {
     use crate::auth::password::PasswordManager;
     use crate::db::models::user::NewUser;
     use crate::db::repositories::user_repository::UserRepository;
+    use crate::db::connection::init_test_pool;
 
     fn create_test_register_request() -> RegisterRequest {
+        init_test_pool();
+
         let unique = uuid::Uuid::new_v4();
         RegisterRequest {
             email: format!("test+{}@example.com", unique),
@@ -373,6 +376,7 @@ mod tests {
 
     #[test]
     fn test_login_user_not_found() {
+        init_test_pool();
         let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key");
         let auth_service = AuthService::new(jwt_manager);
 
@@ -387,6 +391,7 @@ mod tests {
 
     #[test]
     fn test_change_password_success() {
+        init_test_pool();
         // Create user with known password
         let old_hash = PasswordManager::hash("OldPass123!").expect("hash");
         let new_user = NewUser {
@@ -415,6 +420,7 @@ mod tests {
 
     #[test]
     fn test_change_password_wrong_old() {
+        init_test_pool();
         let old_hash = PasswordManager::hash("OldPass123!").expect("hash");
         let new_user = NewUser {
             email: format!("change_pw_wrong_{}@example.com", uuid::Uuid::new_v4()),
