@@ -3,10 +3,11 @@
 use axum::{
     Router,
     extract::Extension,
+    http::{header, Method},
     routing::{delete, get, post},
 };
 use std::sync::Arc;
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::auth::jwt::JwtManager;
 use crate::auth::services::AuthService;
@@ -52,10 +53,46 @@ pub fn user_routes(jwt_manager: JwtManager) -> Router {
 
 /// Construit l'application complète
 pub fn build_router(jwt_manager: JwtManager) -> Router {
+    // Configuration CORS depuis les variables d'environnement
+    let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| {
+            "http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000".to_string()
+        })
+        .split(',')
+        .map(|s| s.trim().parse().expect("Invalid origin URL"))
+        .collect::<Vec<_>>();
+
+    let cors = CorsLayer::new()
+        .allow_origin(allowed_origins)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+            Method::PATCH,
+        ])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::ORIGIN,
+            header::ACCESS_CONTROL_REQUEST_METHOD,
+            header::ACCESS_CONTROL_REQUEST_HEADERS,
+        ])
+        .expose_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+        ])
+        .allow_credentials(true)
+        .max_age(std::time::Duration::from_secs(3600));
+
     Router::new()
         .route("/health", get(health))
         .nest("/auth", auth_routes(jwt_manager.clone()))
         .nest("/users", user_routes(jwt_manager))
+        // Middleware CORS (doit être avant TraceLayer)
+        .layer(cors)
         // Middleware global de tracing
         .layer(TraceLayer::new_for_http())
 }

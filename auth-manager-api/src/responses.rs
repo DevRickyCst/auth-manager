@@ -12,7 +12,7 @@ pub struct UserResponse {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LoginResponse {
     pub access_token: String,
     pub refresh_token: String,
@@ -38,7 +38,7 @@ impl From<LoginResponse> for PublicLoginResponse {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshTokenResponse {
     pub access_token: String,
     pub expires_in: i64,
