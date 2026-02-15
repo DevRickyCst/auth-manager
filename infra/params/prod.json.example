@@ -1,0 +1,5 @@
+{
+  "DatabaseUrl": "postgresql://user:password@host.region.neon.tech/database?sslmode=require",
+  "JwtSecret": "GENERATE_WITH_openssl_rand_-base64_32",
+  "FrontendUrl": "https://your-domain.com"
+}

@@ -7,11 +7,10 @@ use std::sync::OnceLock;
 
 static POOL: OnceLock<DbPool> = OnceLock::new();
 
-/// Initialize the PostgreSQL connection pool using DATABASE_URL.
+/// Initialize the PostgreSQL connection pool with the given database URL.
 /// This should be called once at application startup.
-pub fn init_pool() -> Result<()> {
-    let url = std::env::var("DATABASE_URL").context("DATABASE_URL env var not set")?;
-    let manager = ConnectionManager::<PgConnection>::new(url);
+pub fn init_pool_with_url(database_url: &str) -> Result<()> {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = diesel::r2d2::Pool::builder()
         .max_size(15)
         .build(manager)
@@ -21,6 +20,13 @@ pub fn init_pool() -> Result<()> {
         .map_err(|_| anyhow!("Pool already initialized"))?;
 
     Ok(())
+}
+
+/// Initialize the PostgreSQL connection pool using DATABASE_URL env var.
+/// This should be called once at application startup.
+pub fn init_pool() -> Result<()> {
+    let url = std::env::var("DATABASE_URL").context("DATABASE_URL env var not set")?;
+    init_pool_with_url(&url)
 }
 
 /// Get a reference to the initialized pool.
