@@ -1,4 +1,3 @@
-use std::env;
 mod app;
 mod auth;
 mod config;

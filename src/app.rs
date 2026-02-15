@@ -66,10 +66,10 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
     ];
 
     // Ajouter l'URL frontend (production ou autre)
-    if let Ok(origin) = frontend_url.parse() {
-        if !allowed_origins.contains(&origin) {
-            allowed_origins.push(origin);
-        }
+    if let Ok(origin) = frontend_url.parse()
+        && !allowed_origins.contains(&origin)
+    {
+        allowed_origins.push(origin);
     }
 
     let cors = CorsLayer::new()

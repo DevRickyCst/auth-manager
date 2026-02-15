@@ -26,6 +26,7 @@ impl Environment {
         matches!(self, Self::Production)
     }
 
+    #[allow(dead_code)]
     pub fn is_development(&self) -> bool {
         matches!(self, Self::Development)
     }
@@ -43,7 +44,9 @@ pub struct Config {
     pub environment: Environment,
     pub database_url: String,
     pub jwt_secret: String,
+    #[allow(dead_code)]
     pub jwt_expiration: String,
+    #[allow(dead_code)]
     pub frontend_url: String,
     pub server_host: String,
     pub server_port: u16,
@@ -180,12 +183,12 @@ impl Config {
 
     /// Masque les credentials dans les logs
     fn mask_credentials(url: &str) -> String {
-        if let Some(at_pos) = url.find('@') {
-            if let Some(scheme_end) = url.find("://") {
-                let scheme = &url[..scheme_end + 3];
-                let after_at = &url[at_pos..];
-                return format!("{}***:***{}", scheme, after_at);
-            }
+        if let Some(at_pos) = url.find('@')
+            && let Some(scheme_end) = url.find("://")
+        {
+            let scheme = &url[..scheme_end + 3];
+            let after_at = &url[at_pos..];
+            return format!("{}***:***{}", scheme, after_at);
         }
         url.to_string()
     }
@@ -196,6 +199,7 @@ impl Config {
     }
 
     /// Retourne true si on est en mode développement
+    #[allow(dead_code)]
     pub fn is_development(&self) -> bool {
         self.environment.is_development()
     }
@@ -207,26 +211,40 @@ mod tests {
 
     #[test]
     fn test_environment_detection_lambda() {
-        env::set_var("AWS_LAMBDA_FUNCTION_NAME", "test-function");
+        unsafe {
+            env::set_var("AWS_LAMBDA_FUNCTION_NAME", "test-function");
+        }
         assert_eq!(Environment::detect(), Environment::Production);
-        env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
+        unsafe {
+            env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
+        }
     }
 
     #[test]
     fn test_environment_detection_app_env() {
-        env::set_var("APP_ENV", "production");
+        unsafe {
+            env::set_var("APP_ENV", "production");
+        }
         assert_eq!(Environment::detect(), Environment::Production);
-        env::remove_var("APP_ENV");
+        unsafe {
+            env::remove_var("APP_ENV");
+        }
 
-        env::set_var("APP_ENV", "development");
+        unsafe {
+            env::set_var("APP_ENV", "development");
+        }
         assert_eq!(Environment::detect(), Environment::Development);
-        env::remove_var("APP_ENV");
+        unsafe {
+            env::remove_var("APP_ENV");
+        }
     }
 
     #[test]
     fn test_environment_detection_default() {
-        env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
-        env::remove_var("APP_ENV");
+        unsafe {
+            env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
+            env::remove_var("APP_ENV");
+        }
         assert_eq!(Environment::detect(), Environment::Development);
     }
 
