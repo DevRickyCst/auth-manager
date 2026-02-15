@@ -12,6 +12,12 @@ target/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.*.production
+
+# SAM parameters (contains credentials)
+infra/params/*.json
+!infra/params/*.json.example
 
 # Logs
 *.log

@@ -59,8 +59,18 @@ restart: ## Restart development environment
 # Database Management
 # ============================================================================
 
-migrate: ## Run database migrations
+migrate: ## Run database migrations (local)
 	$(COMPOSE_DEV) run --rm auth-manager diesel migration run
+
+migrate-prod: ## Run database migrations (production Neon)
+	@echo "🚀 Running migrations on production database..."
+	@if [ ! -f .env.production ]; then \
+		echo "❌ .env.production not found!"; \
+		exit 1; \
+	fi
+	@export $$(cat .env.production | grep -v '^#' | xargs) && \
+		diesel migration run && \
+		echo "✅ Migrations completed successfully!"
 
 revert: ## Revert last database migration
 	$(COMPOSE_DEV) run --rm auth-manager diesel migration revert
@@ -79,8 +89,19 @@ db-reset: ## Reset database (WARNING: deletes all data)
 		echo "Cancelled."; \
 	fi
 
-db-shell: ## Open PostgreSQL shell
+db-shell: ## Open PostgreSQL shell (local)
 	$(COMPOSE_DEV) exec auth_db psql -U postgres -d auth_db
+
+db-shell-prod: ## Open PostgreSQL shell (production Neon)
+	@if [ ! -f .env.production ]; then \
+		echo "❌ .env.production not found!"; \
+		exit 1; \
+	fi
+	@export $$(cat .env.production | grep -v '^#' | xargs) && \
+		psql $$DATABASE_URL
+
+db-check-prod: ## Check production database health
+	@./scripts/neon-check.sh
 
 # ============================================================================
 # Testing
@@ -160,6 +181,13 @@ deploy-create-stack: ## Create Lambda infrastructure (first time only)
 	AWS_PROFILE=perso ./scripts/deploy-lambda.sh --create-stack
 
 deploy: ## Deploy to Lambda (build + push + update)
+	@if [ ! -f infra/params/prod.json ]; then \
+		echo "❌ infra/params/prod.json not found!"; \
+		echo "Create it from template: cp infra/params/prod.json.example infra/params/prod.json"; \
+		echo "Then edit it with your production credentials."; \
+		exit 1; \
+	fi
+	@echo "✅ Using credentials from infra/params/prod.json"
 	AWS_PROFILE=perso ./scripts/deploy-lambda.sh
 
 deploy-only: ## Update Lambda without rebuilding Docker image

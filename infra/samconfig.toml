@@ -16,13 +16,8 @@ resolve_s3 = true
 s3_prefix = "auth-manager-prod"
 region = "eu-central-1"
 image_repositories = ["AuthManagerFunction=859456618518.dkr.ecr.eu-central-1.amazonaws.com/auth-manager-prod"]
-parameter_overrides = [
-    "DatabaseUrl=postgres://user:pass@host:5432/db",
-    "JwtSecret=CHANGE_ME_IN_PRODUCTION",
-    "CorsAllowedOrigins=https://yourdomain.com",
-    "LambdaMemorySize=1024",
-    "LambdaTimeout=30"
-]
+# parameter_overrides are now passed via infra/params/prod.json (not committed)
+# See README.md for setup instructions
 
 [default.package.parameters]
 resolve_s3 = true

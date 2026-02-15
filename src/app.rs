@@ -3,7 +3,7 @@
 use axum::{
     Router,
     extract::Extension,
-    http::{header, Method},
+    http::{Method, header},
     routing::{delete, get, post},
 };
 use std::sync::Arc;
@@ -53,14 +53,24 @@ pub fn user_routes(jwt_manager: JwtManager) -> Router {
 
 /// Construit l'application complète
 pub fn build_router(jwt_manager: JwtManager) -> Router {
-    // Configuration CORS depuis les variables d'environnement
-    let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| {
-            "http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000".to_string()
-        })
-        .split(',')
-        .map(|s| s.trim().parse().expect("Invalid origin URL"))
-        .collect::<Vec<_>>();
+    // Configuration CORS depuis FRONTEND_URL (déjà configuré via config.rs)
+    // En production: https://dofus-graal.eu
+    // En développement: http://localhost:8080
+    let frontend_url =
+        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+
+    // Toujours autoriser localhost pour le développement local
+    let mut allowed_origins = vec![
+        "http://localhost:8080".parse().expect("Invalid origin"),
+        "http://127.0.0.1:8080".parse().expect("Invalid origin"),
+    ];
+
+    // Ajouter l'URL frontend (production ou autre)
+    if let Ok(origin) = frontend_url.parse()
+        && !allowed_origins.contains(&origin)
+    {
+        allowed_origins.push(origin);
+    }
 
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
@@ -80,10 +90,7 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
             header::ACCESS_CONTROL_REQUEST_METHOD,
             header::ACCESS_CONTROL_REQUEST_HEADERS,
         ])
-        .expose_headers([
-            header::CONTENT_TYPE,
-            header::AUTHORIZATION,
-        ])
+        .expose_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
         .allow_credentials(true)
         .max_age(std::time::Duration::from_secs(3600));
 

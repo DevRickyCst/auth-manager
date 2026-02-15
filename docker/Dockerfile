@@ -53,6 +53,9 @@ RUN apt-get update && apt-get install -y \
 # Copy dependency files first for caching
 COPY Cargo.toml Cargo.lock ./
 
+# Copy auth-manager-api workspace (required dependency)
+COPY auth-manager-api ./auth-manager-api
+
 # Create dummy src to cache dependencies
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \

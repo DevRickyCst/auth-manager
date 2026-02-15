@@ -6,27 +6,17 @@ Parameters:
   DatabaseUrl:
     Type: String
     NoEcho: true
-    Description: PostgreSQL connection string
+    Description: PostgreSQL connection string (Neon)
 
   JwtSecret:
     Type: String
     NoEcho: true
-    Description: JWT secret key for token signing
+    Description: JWT secret key (32+ characters)
 
-  CorsAllowedOrigins:
+  FrontendUrl:
     Type: String
-    Default: '*'
-    Description: Comma-separated list of allowed CORS origins
-
-  LambdaMemorySize:
-    Type: Number
-    Default: 1024
-    Description: Lambda memory in MB
-
-  LambdaTimeout:
-    Type: Number
-    Default: 30
-    Description: Lambda timeout in seconds
+    Default: "https://dofus-graal.eu"
+    Description: Frontend URL for CORS
 
 Resources:
   # ============================================================================
@@ -39,20 +29,18 @@ Resources:
       FunctionName: auth-manager-prod
       PackageType: Image
       ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/auth-manager-prod:latest'
-      Timeout: !Ref LambdaTimeout
-      MemorySize: !Ref LambdaMemorySize
+      Timeout: 30
+      MemorySize: 1024
       Architectures:
         - x86_64
       Tracing: Active
       Environment:
         Variables:
-          RUST_LOG: info,auth_manager=info,hyper_util=warn,tower_http=warn
           APP_ENV: production
           DATABASE_URL: !Ref DatabaseUrl
           JWT_SECRET: !Ref JwtSecret
-          CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
-          CORS_ALLOWED_METHODS: GET,POST,PUT,DELETE,OPTIONS
-          BCRYPT_COST: '12'
+          FRONTEND_URL: !Ref FrontendUrl
+          RUST_LOG: info
       Events:
         HttpApiEvent:
           Type: HttpApi

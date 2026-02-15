@@ -1,12 +1,13 @@
-use std::env;
 mod app;
 mod auth;
+mod config;
 mod db;
 mod error;
 mod handlers;
 mod response;
 
 use app::build_router;
+use config::Config;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn setup_logging() {
@@ -29,28 +30,49 @@ pub fn setup_logging() {
 async fn main() -> Result<(), lambda_http::Error> {
     // Initialize logging for all environments
     setup_logging();
-    tracing::info!("Starting auth-manager...");
+    tracing::info!("🚀 Starting auth-manager...");
+
+    // Load configuration (auto-détecte l'environnement)
+    tracing::info!("📦 Loading configuration...");
+    let config = match Config::from_env() {
+        Ok(cfg) => {
+            tracing::info!("✅ Configuration loaded successfully");
+            cfg
+        }
+        Err(e) => {
+            tracing::error!("❌ Failed to load configuration: {:#}", e);
+            panic!("Configuration error: {}", e);
+        }
+    };
 
     // Initialize database connection pool
-    db::connection::init_pool().expect("Failed to initialize database connection pool");
-    tracing::info!("Database connection pool initialized");
+    tracing::info!("🔌 Initializing database connection pool...");
+    if let Err(e) = db::connection::init_pool_with_url(&config.database_url) {
+        tracing::error!("❌ Failed to initialize database connection pool: {:#}", e);
+        tracing::error!("   This is usually caused by:");
+        tracing::error!("   1. DATABASE_URL is incorrect");
+        tracing::error!("   2. Database is not accessible from Lambda");
+        tracing::error!("   3. Credentials are invalid");
+        tracing::error!("   4. SSL/TLS issues");
+        panic!("Database connection error: {}", e);
+    }
+    tracing::info!("✅ Database connection pool initialized");
 
-    let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| {
-        tracing::warn!("JWT_SECRET not set, using default (NOT FOR PRODUCTION!)");
-        "default_secret".to_string()
-    });
+    // Create JWT manager
+    let jwt_manager = auth::jwt::JwtManager::new(&config.jwt_secret);
 
-    let jwt_manager = auth::jwt::JwtManager::new(&jwt_secret);
+    // Build router
     let app = build_router(jwt_manager);
 
-    if env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
-        tracing::info!("Running in Lambda mode");
+    // Run server based on environment
+    if config.is_production() {
+        tracing::info!("☁️  Running in AWS Lambda mode");
         lambda_http::run(app).await
     } else {
-        tracing::info!("Running in local HTTP server mode");
-        let addr = "0.0.0.0:3000";
-        let listener = tokio::net::TcpListener::bind(addr).await?;
-        tracing::info!("🚀 Server running at http://{}", addr);
+        tracing::info!("💻 Running in local HTTP server mode");
+        let addr = format!("{}:{}", config.server_host, config.server_port);
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        tracing::info!("🌐 Server listening on http://{}", addr);
         axum::serve(listener, app).await?;
 
         Ok(())

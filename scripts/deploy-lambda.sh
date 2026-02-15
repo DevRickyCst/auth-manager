@@ -214,6 +214,30 @@ deploy_sam_stack() {
     print_info "Region: $AWS_REGION"
     print_info "Profile: $AWS_PROFILE"
 
+    # Check if params/prod.json exists
+    if [ ! -f "params/prod.json" ]; then
+        print_error "params/prod.json not found!"
+        echo ""
+        echo "Create it from template:"
+        echo "  cp params/prod.json.example params/prod.json"
+        echo "  # Edit params/prod.json with your production credentials"
+        exit 1
+    fi
+
+    # Check if jq is available
+    if ! command -v jq &> /dev/null; then
+        print_error "jq is not installed (required to read params/prod.json)"
+        echo ""
+        echo "Install jq:"
+        echo "  brew install jq  # macOS"
+        echo "  apt-get install jq  # Ubuntu/Debian"
+        exit 1
+    fi
+
+    # Read parameters from JSON and convert to SAM format
+    print_info "Reading parameters from params/prod.json..."
+    local param_overrides=$(jq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' params/prod.json)
+
     # Check if samconfig.toml needs updating
     local account_id=$(get_aws_account_id)
     local ecr_repo_uri="${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com/auth-manager-prod"
@@ -235,6 +259,7 @@ deploy_sam_stack() {
         --stack-name "$STACK_NAME" \
         --region "$AWS_REGION" \
         --profile "$AWS_PROFILE" \
+        --parameter-overrides $param_overrides \
         --no-confirm-changeset \
         --no-fail-on-empty-changeset
 
@@ -310,7 +335,9 @@ PREREQUISITES:
     1. AWS CLI installed and configured
     2. SAM CLI installed (pip install aws-sam-cli)
     3. Docker installed and running
-    4. Edit infra/samconfig.toml with your parameters
+    4. jq installed (brew install jq)
+    5. Create infra/params/prod.json with your credentials
+       (copy from infra/params/prod.json.example)
 
 EOF
 }
