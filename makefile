@@ -6,9 +6,8 @@
 .PHONY: help
 .DEFAULT_GOAL := help
 
-# Docker Compose configurations
-COMPOSE_DEV = docker compose -f docker/docker-compose.yml
-COMPOSE_TEST = $(COMPOSE_DEV) -f docker/docker-compose.test.yml
+# Root docker-compose (PostgreSQL only)
+ROOT_COMPOSE = docker compose -f ../docker-compose.yml
 
 # Test parameter (usage: make test t=test_name)
 t ?=
@@ -26,11 +25,11 @@ help: ## Show this help message
 		sort
 	@echo ""
 	@echo "Usage Examples:"
-	@echo "  make local                    # Start development environment"
+	@echo "  make db-start                 # Start both PostgreSQL databases"
+	@echo "  make local                    # Start app with hot reload"
 	@echo "  make test                     # Run all tests"
 	@echo "  make test t=test_login        # Run specific test"
-	@echo "  make logs                     # Follow all logs"
-	@echo "  make shell                    # Open shell in app container"
+	@echo "  make db-logs                  # Follow database logs"
 	@echo ""
 	@echo "Lambda Deployment:"
 	@echo "  make deploy-create-stack      # Create Lambda stack (first time)"
@@ -39,28 +38,33 @@ help: ## Show this help message
 	@echo "  make deploy-status            # Show stack status and outputs"
 
 # ============================================================================
+# Database Management (via root docker-compose)
+# ============================================================================
+
+db-start: ## Start both PostgreSQL databases (dev port 5432 + test port 5433)
+	$(ROOT_COMPOSE) up -d
+
+db-stop: ## Stop both PostgreSQL databases
+	$(ROOT_COMPOSE) down
+
+db-logs: ## Follow database logs
+	$(ROOT_COMPOSE) logs -f
+
+# ============================================================================
 # Development Environment
 # ============================================================================
 
-local: ## Start local development environment (app + PostgreSQL)
-	$(COMPOSE_DEV) up --build
+local: ## Run app locally with hot reload (requires db-start)
+	cargo watch -x run
 
-local-detached: ## Start local environment in background
-	$(COMPOSE_DEV) up --build -d
-
-stop: ## Stop all running containers
-	$(COMPOSE_DEV) down
-	$(COMPOSE_TEST) down
-
-restart: ## Restart development environment
-	$(COMPOSE_DEV) restart
+stop: db-stop ## Stop all databases
 
 # ============================================================================
-# Database Management
+# Database Operations
 # ============================================================================
 
-migrate: ## Run database migrations (local)
-	$(COMPOSE_DEV) run --rm auth-manager diesel migration run
+migrate: ## Run database migrations
+	diesel migration run
 
 migrate-prod: ## Run database migrations (production Neon)
 	@echo "🚀 Running migrations on production database..."
@@ -73,24 +77,21 @@ migrate-prod: ## Run database migrations (production Neon)
 		echo "✅ Migrations completed successfully!"
 
 revert: ## Revert last database migration
-	$(COMPOSE_DEV) run --rm auth-manager diesel migration revert
+	diesel migration revert
 
 db-reset: ## Reset database (WARNING: deletes all data)
 	@echo "WARNING: This will delete all data in the database!"
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		$(COMPOSE_DEV) down -v; \
-		$(COMPOSE_DEV) up -d auth_db; \
-		sleep 5; \
-		$(COMPOSE_DEV) run --rm auth-manager diesel database setup; \
+		diesel database reset; \
 		echo "Database reset complete!"; \
 	else \
 		echo "Cancelled."; \
 	fi
 
-db-shell: ## Open PostgreSQL shell (local)
-	$(COMPOSE_DEV) exec auth_db psql -U postgres -d auth_db
+db-shell: ## Open PostgreSQL shell (local dev)
+	psql $(DATABASE_URL)
 
 db-shell-prod: ## Open PostgreSQL shell (production Neon)
 	@if [ ! -f .env.production ]; then \
@@ -107,40 +108,12 @@ db-check-prod: ## Check production database health
 # Testing
 # ============================================================================
 
-test: ## Run tests in dev container (fast, recommended)
-	@echo "🧪 Running tests in dev container..."
-	@docker exec auth-manager-app cargo test $(t) -- --test-threads=1
-
-test-isolated: ## Run tests in isolated container (slow, more memory)
-	@echo "🧪 Running tests in isolated test container..."
-	$(COMPOSE_TEST) run --rm test-runner bash -c "diesel database setup && cargo test $(t) -- --test-threads=5"
-	@$(MAKE) test-cleanup
+test: ## Run all tests (requires db-start)
+	@echo "🧪 Running tests..."
+	@cargo test $(t) -- --test-threads=1
 
 test-watch: ## Run tests in watch mode
-	$(COMPOSE_TEST) run --rm test-runner bash -c "diesel database setup && cargo watch -x 'test $(t) -- --test-threads=5'"
-	@$(MAKE) test-cleanup
-
-test-cleanup: ## Cleanup test containers and volumes
-	$(COMPOSE_TEST) down -v
-
-# ============================================================================
-# Logs & Debugging
-# ============================================================================
-
-logs: ## Follow logs from all containers
-	$(COMPOSE_DEV) logs -f
-
-logs-app: ## Follow logs from application only
-	$(COMPOSE_DEV) logs -f auth-manager
-
-logs-db: ## Follow logs from database only
-	$(COMPOSE_DEV) logs -f auth_db
-
-shell: ## Open shell in application container
-	$(COMPOSE_DEV) exec auth-manager bash
-
-shell-test: ## Open shell in test runner container
-	$(COMPOSE_TEST) run --rm test-runner bash
+	cargo watch -x 'test $(t) -- --test-threads=1'
 
 # ============================================================================
 # Code Quality & CI
@@ -167,7 +140,7 @@ ci: fmt-check clippy test ## Run all CI checks (format, lint, test)
 build: ## Build the project locally
 	cargo build --release
 
-run: ## Run the project locally (requires PostgreSQL and .env)
+run: ## Run the project locally (requires db-start and .env)
 	cargo run
 
 dev: ## Run with cargo-watch for hot reload
@@ -230,9 +203,8 @@ clean: ## Remove build artifacts
 	cargo clean
 	rm -rf bin/
 
-clean-all: clean ## Remove all artifacts, volumes, and containers
-	$(COMPOSE_DEV) down -v --remove-orphans
-	$(COMPOSE_TEST) down -v --remove-orphans
+clean-all: clean ## Remove all artifacts, volumes, and databases
+	$(ROOT_COMPOSE) down -v
 	docker volume prune -f
 	@echo "All cleaned up!"
 
@@ -242,4 +214,4 @@ clean-all: clean ## Remove all artifacts, volumes, and containers
 
 check-context: ## Verify Docker build context size
 	@echo "Checking Docker build context size..."
-	@docker build -f docker/Dockerfile --no-cache --target base .. 2>&1 | grep "Sending build context" || echo "Build context check complete"
+	@docker build -f infra/Dockerfile --no-cache --target builder . 2>&1 | grep "Sending build context" || echo "Build context check complete"

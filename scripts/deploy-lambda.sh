@@ -129,7 +129,7 @@ build_and_push_image() {
     docker build \
         --platform linux/amd64 \
         --target runtime \
-        -f docker/Dockerfile \
+        -f infra/Dockerfile \
         -t "$ecr_uri:latest" \
         .
 
@@ -416,7 +416,7 @@ main() {
         docker build \
             --platform linux/amd64 \
             --target runtime \
-            -f docker/Dockerfile \
+            -f infra/Dockerfile \
             -t "$ecr_uri:latest" \
             .
 

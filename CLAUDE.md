@@ -10,34 +10,35 @@ Production-grade Rust authentication service using Axum, Tokio, Diesel (PostgreS
 
 ## Essential Commands
 
+### Bases de données (PostgreSQL géré à la racine du monorepo)
+```bash
+# Démarrer postgres-dev (5432) + postgres-test (5433, tmpfs)
+make db-start       # → docker compose -f ../docker-compose.yml up -d
+make db-stop        # → docker compose -f ../docker-compose.yml down
+make db-logs        # → docker compose -f ../docker-compose.yml logs -f
+make db-shell       # → psql $DATABASE_URL (localhost:5432)
+```
+
 ### Local Development
 ```bash
-# Start local stack (app + PostgreSQL)
-make local
+# Hot-reload (nécessite cargo-watch)
+make local          # → cargo watch -x run
 
-# Start in background
-make local-detached
-
-# Stop all containers
-make stop
-
-# Run database migrations
-make migrate
-
-# Revert last migration
-make revert
-
-# Run all tests
-make test
-
-# Run specific test
-make test t=test_name
-
-# Build the project
-cargo build
-
-# Run locally (requires PostgreSQL and env vars)
+# Lancer une fois
 cargo run
+
+# Migrations
+make migrate        # → diesel migration run
+make revert         # → diesel migration revert
+make db-reset       # → diesel database reset (SUPPRIME TOUTES LES DONNÉES)
+
+# Tests (nécessite make db-start)
+make test           # → cargo test -- --test-threads=1
+make test t=test_name
+make test-watch     # → cargo watch -x 'test -- --test-threads=1'
+
+# Build
+cargo build --release
 
 # Format and lint
 cargo fmt
@@ -70,18 +71,16 @@ make deploy-status
 
 ### Database Operations
 ```bash
-# Setup database and run migrations
-diesel setup
-diesel migration run
+# Les bases PostgreSQL sont gérées par docker-compose.yml à la RACINE du monorepo
+# postgres-dev → localhost:5432  (volume persistant)
+# postgres-test → localhost:5433 (tmpfs, pour les tests)
 
-# Revert last migration
-diesel migration revert
-
-# Open PostgreSQL shell
-make db-shell
-
-# Reset database (WARNING: deletes all data)
-make db-reset
+make db-start                    # démarrer les deux bases
+diesel migration run             # ou: make migrate
+diesel migration revert          # ou: make revert
+diesel migration generate name   # créer une migration
+diesel database reset            # ou: make db-reset
+make db-shell                    # psql sur localhost:5432
 ```
 
 ## Architecture
@@ -99,11 +98,20 @@ auth-manager/
 │       ├── responses.rs          # Response DTOs
 │       ├── error.rs              # ErrorResponse
 │       └── result.rs             # AppResponse (WASM-compatible)
-└── src/                          # Backend code
-    ├── response.rs               # Axum integration wrapper
-    ├── handlers/
-    ├── auth/
-    └── db/
+├── src/                          # Backend code
+│   ├── response.rs               # Axum integration wrapper
+│   ├── handlers/
+│   ├── auth/
+│   └── db/
+├── migrations/                   # Migrations Diesel
+├── infra/                        # Infrastructure de déploiement Lambda
+│   ├── Dockerfile                # Image Lambda (builder → runtime ECR)
+│   ├── template.yaml             # SAM template
+│   ├── samconfig.toml
+│   └── params/                   # Paramètres prod (non commités)
+└── scripts/
+    ├── deploy-lambda.sh
+    └── neon-check.sh
 ```
 
 ### Layered Design (Mandatory)
@@ -201,22 +209,21 @@ cargo build --manifest-path auth-manager-api/Cargo.toml --target wasm32-unknown-
 
 ## Configuration
 
-Environment variables required:
+Environment variables required (copier `.env.example` → `.env`):
 
 ```env
 # App
 APP_ENV=development
 SERVER_HOST=0.0.0.0
-SERVER_PORT=8080
+SERVER_PORT=3000
 RUST_LOG=debug
 
-# Database
-DATABASE_URL=postgres://postgres:postgres@auth_db:5432/auth_db
-DB_POOL_MAX_SIZE=15
+# Database (PostgreSQL géré par docker-compose.yml à la racine du monorepo)
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/auth_db
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5433/auth_test_db
 
 # CORS
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE
+FRONTEND_URL=http://localhost:8080
 
 # JWT (HS256)
 JWT_SECRET=your_secret_key_here
@@ -278,11 +285,12 @@ BCRYPT_COST=12
 
 ## Testing
 
-Tests are run via Docker Compose to ensure a clean database environment:
+Les tests utilisent `postgres-test` sur `localhost:5433` (tmpfs, rapide, pas de persistance).
+Prérequis : `make db-start` depuis auth-manager (ou `docker compose up -d` depuis la racine).
 
 ```bash
 # Run all tests
-make test
+make test           # → cargo test -- --test-threads=1
 
 # Run specific test
 make test t=test_login
