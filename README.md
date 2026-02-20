@@ -1,6 +1,6 @@
 # Auth Manager
 
-Service d'authentification production-ready en Rust, conçu pour fonctionner en local et sur AWS Lambda.
+Service d'authentification production-ready en Rust, conçu pour fonctionner nativement en local et déployé sur AWS Lambda.
 
 **Architecture multi-crate** : Le projet inclut un crate API (`auth-manager-api`) WASM-compatible pour partager les types entre backend et frontend.
 
@@ -14,30 +14,26 @@ Service d'authentification production-ready en Rust, conçu pour fonctionner en 
 - ✅ Changement de mot de passe
 - ✅ Validation des entrées
 - ✅ Gestion des tentatives de connexion
-- ✅ Support Docker et Docker Compose
-- ✅ Déploiement AWS Lambda
+- ✅ Déploiement AWS Lambda (image ECR)
 - ✅ Base de données PostgreSQL avec Diesel ORM
 - ✅ API types WASM-compatible pour intégration frontend
 
 ## Prérequis
 
-- **Docker** et **Docker Compose** (recommandé)
-- **Rust** 1.92+ (si exécution locale sans Docker)
-- **PostgreSQL** 15+ (si exécution locale sans Docker)
-- **Make** (pour les commandes simplifiées)
+- **Rust** 1.92+
+- **Docker & Docker Compose** (PostgreSQL uniquement — géré à la racine du monorepo)
+- **diesel_cli** — migrations base de données
+- **cargo-watch** — hot-reload en développement
+- **Make**
+
+```bash
+cargo install diesel_cli --no-default-features --features postgres
+cargo install cargo-watch
+```
 
 ## Installation
 
-### 1. Cloner le projet
-
-```bash
-git clone <repository-url>
-cd auth-manager
-```
-
-### 2. Configuration
-
-Copiez le fichier d'exemple et ajustez les variables d'environnement :
+### 1. Configuration
 
 ```bash
 cp .env.example .env
@@ -46,48 +42,49 @@ cp .env.example .env
 Variables importantes :
 
 ```env
-# Configuration du serveur
 SERVER_HOST=0.0.0.0
 SERVER_PORT=3000
 RUST_LOG=debug
 
-# Base de données
-DATABASE_URL=postgres://postgres:postgres@auth_db:5432/auth_db
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/auth_db
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5433/auth_test_db
 
-# JWT
 JWT_SECRET=votre_secret_jwt_ici
-
-# CORS
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+FRONTEND_URL=http://localhost:8080
 ```
 
-### 3. Démarrer l'application
+### 2. Démarrer les bases de données
 
-#### Avec Docker (recommandé)
+Les bases PostgreSQL sont gérées par le `docker-compose.yml` à la **racine du monorepo** :
 
 ```bash
-# Démarrer les services (app + PostgreSQL)
-make local
+# Depuis la racine du monorepo
+docker compose up -d
 
-# Ou en arrière-plan
-make local-detached
+# Ou depuis auth-manager via make
+make db-start
 ```
 
-L'application sera accessible sur `http://localhost:3000`
+| Base | Port | Persistance |
+|---|---|---|
+| `postgres-dev` | `5432` | volume Docker |
+| `postgres-test` | `5433` | tmpfs (RAM) |
 
-#### Sans Docker
+### 3. Migrations
 
 ```bash
-# Installer Diesel CLI
-cargo install diesel_cli --no-default-features --features postgres
+make migrate   # → diesel migration run
+```
 
-# Lancer les migrations
-diesel migration run
+### 4. Lancer l'application
 
-# Compiler et lancer
-cargo build --release
+```bash
+make local     # hot-reload → cargo watch -x run
+# ou
 cargo run
 ```
+
+L'application est accessible sur `http://localhost:3000`.
 
 ## API Endpoints
 
@@ -187,105 +184,114 @@ Authorization: Bearer <access_token>
 ### Commandes Make
 
 ```bash
-# Développement
-make local              # Démarrer l'environnement de développement
-make stop               # Arrêter tous les conteneurs
-make restart            # Redémarrer l'environnement
+# ── Bases de données ──────────────────────────────────────────
+make db-start           # Démarrer postgres-dev + postgres-test (docker compose racine)
+make db-stop            # Arrêter les bases
+make db-logs            # Suivre les logs des bases
+make db-shell           # Shell psql → localhost:5432
+make db-shell-prod      # Shell psql → Neon (production)
 
-# Base de données
-make migrate            # Appliquer les migrations
-make revert             # Annuler la dernière migration
-make db-shell           # Ouvrir un shell PostgreSQL
-make db-reset           # Réinitialiser la base de données
+# ── Application ───────────────────────────────────────────────
+make local              # Hot-reload → cargo watch -x run
+make run                # Lancer une fois → cargo run
+make stop               # Arrêter les bases (alias db-stop)
 
-# Tests
-make test               # Lancer tous les tests
-make test t=test_login  # Lancer un test spécifique
+# ── Migrations ────────────────────────────────────────────────
+make migrate            # → diesel migration run
+make revert             # → diesel migration revert
+make db-reset           # Reset complet (SUPPRIME TOUTES LES DONNÉES)
+
+# ── Tests ─────────────────────────────────────────────────────
+make test               # → cargo test -- --test-threads=1
+make test t=test_login  # Test spécifique
 make test-watch         # Tests en mode watch
 
-# Code Quality
-make fmt                # Formater le code
-make clippy             # Linter
-make ci                 # Vérifications CI (format + lint + tests)
+# ── Code Quality ──────────────────────────────────────────────
+make check              # cargo check
+make fmt                # cargo fmt
+make clippy             # cargo clippy
+make ci                 # format + lint + test
 
-# API Crate
-cargo test -p auth-manager-api                      # Tests du crate API
+# ── Build ─────────────────────────────────────────────────────
+make build              # cargo build --release
+
+# ── API Crate ─────────────────────────────────────────────────
+cargo test -p auth-manager-api
 cargo build --manifest-path auth-manager-api/Cargo.toml \
-  --target wasm32-unknown-unknown --release         # Build WASM
+  --target wasm32-unknown-unknown --release
 
-# Logs
-make logs               # Suivre tous les logs
-make logs-app           # Logs de l'application uniquement
-make logs-db            # Logs de la base de données
-
-# Shells
-make shell              # Shell dans le conteneur app
-make shell-test         # Shell dans le conteneur de tests
+# ── Déploiement Lambda ────────────────────────────────────────
+make deploy-create-stack   # Créer l'infra (première fois)
+make deploy                # Build image Docker → push ECR → update Lambda
+make deploy-only           # Update Lambda sans rebuild
+make deploy-logs           # Logs Lambda en temps réel
+make deploy-status         # Statut du stack CloudFormation
 ```
 
 ### Structure du projet
 
 ```
 auth-manager/
-├── Cargo.toml                  # Backend package
+├── Cargo.toml                  # Package principal
 ├── auth-manager-api/           # 🎯 API types crate (WASM-compatible)
-│   ├── Cargo.toml              # Dépendances minimales
-│   ├── README.md               # Documentation du crate
+│   ├── Cargo.toml
 │   └── src/
-│       ├── lib.rs              # Exports publics
+│       ├── lib.rs
 │       ├── requests.rs         # DTOs de requête
 │       ├── responses.rs        # DTOs de réponse
 │       ├── error.rs            # Format d'erreur
 │       └── result.rs           # Wrapper de réponse
-├── src/                        # Backend code
+├── src/                        # Code backend
 │   ├── response.rs             # Wrapper Axum pour API types
-│   ├── auth/                   # Module d'authentification
+│   ├── auth/
 │   │   ├── jwt.rs              # Gestion JWT
 │   │   ├── password.rs         # Hachage bcrypt
 │   │   ├── services.rs         # Logique métier
 │   │   └── extractors.rs       # Extracteurs Axum
-│   ├── db/                     # Couche de persistance
+│   ├── db/
 │   │   ├── models/             # Modèles Diesel
 │   │   ├── repositories/       # Accès base de données
-│   │   ├── schema.rs           # Schéma généré
-│   │   └── connection.rs       # Pool de connexions
-│   ├── handlers/               # Gestionnaires HTTP
-│   │   ├── auth.rs             # Routes d'auth
-│   │   ├── user.rs             # Routes utilisateur
-│   │   └── health.rs           # Santé
+│   │   ├── schema.rs           # Schéma généré par Diesel
+│   │   └── connection.rs       # Pool de connexions r2d2
+│   ├── handlers/
+│   │   ├── auth.rs
+│   │   ├── user.rs
+│   │   └── health.rs
 │   ├── app.rs                  # Configuration du routeur
 │   ├── error.rs                # Types d'erreur
-│   └── main.rs                 # Point d'entrée
+│   └── main.rs                 # Point d'entrée (local + Lambda)
 ├── migrations/                 # Migrations Diesel
-├── docker/                     # Fichiers Docker
-│   ├── Dockerfile              # Image de développement
-│   ├── Dockerfile.lambda       # Image Lambda optimisée
-│   ├── docker-compose.yml      # Stack de dev
-│   └── docker-compose.test.yml # Stack de tests
+├── infra/                      # Infrastructure de déploiement
+│   ├── Dockerfile              # Image Lambda (builder → runtime)
+│   ├── template.yaml           # SAM template
+│   ├── samconfig.toml
+│   └── params/                 # Paramètres prod (non commités)
+├── scripts/
+│   ├── deploy-lambda.sh        # Script de déploiement AWS
+│   └── neon-check.sh           # Vérification DB prod
 ├── postman/                    # Collection Postman
-├── .env.example                # Variables d'environnement exemple
-├── diesel.toml                 # Configuration Diesel
-├── makefile                    # Commandes simplifiées
-└── CLAUDE.md                   # Guide pour Claude Code
+├── .env.example
+├── diesel.toml
+├── makefile
+└── CLAUDE.md
 ```
 
 ### Ajouter une migration
 
 ```bash
-# Créer une nouvelle migration
 diesel migration generate nom_migration
-
-# Éditer les fichiers up.sql et down.sql dans migrations/
-
-# Appliquer la migration
+# Éditer migrations/.../up.sql et down.sql
 make migrate
 ```
 
 ### Tests
 
-Les tests sont exécutés dans un environnement Docker isolé avec une base de données de test dédiée :
+Les tests utilisent la base **postgres-test** (`localhost:5433`, tmpfs) :
 
 ```bash
+# S'assurer que les bases tournent
+make db-start
+
 # Tous les tests
 make test
 
@@ -294,41 +300,37 @@ make test t=test_register_success
 
 # Avec sortie détaillée
 make test t=test_name -- --nocapture
+
+# Mode watch
+make test-watch
 ```
 
 ## Déploiement AWS Lambda
 
+Le backend est déployé en tant qu'image Docker sur AWS Lambda via ECR + SAM.
+Le `Dockerfile` se trouve dans `infra/Dockerfile`.
+
 ### 1. Premier déploiement (création de l'infrastructure)
 
 ```bash
-# Crée le stack CloudFormation avec ECR, Lambda, API Gateway
 make deploy-create-stack
 ```
 
 ### 2. Déploiements suivants
 
 ```bash
-# Déploiement complet (build + push + update)
-make deploy
-
-# Mise à jour sans rebuild (si l'image existe déjà)
-make deploy-only
-
-# Voir les logs Lambda en temps réel
-make deploy-logs
-
-# Afficher le statut du stack
-make deploy-status
+make deploy          # build image → push ECR → update Lambda
+make deploy-only     # update Lambda sans rebuild
+make deploy-logs     # logs en temps réel
+make deploy-status   # statut du stack
 ```
 
-### Configuration Lambda
-
-Variables d'environnement requises dans la fonction Lambda :
+### Variables d'environnement Lambda
 
 ```
-DATABASE_URL=postgres://...
+DATABASE_URL=postgres://...   # Neon PostgreSQL
 JWT_SECRET=...
-CORS_ALLOWED_ORIGINS=https://yourdomain.com
+FRONTEND_URL=https://dofus-graal.eu
 BCRYPT_COST=12
 RUST_LOG=info
 ```
@@ -337,137 +339,58 @@ RUST_LOG=info
 
 ### Backend (`auth-manager`)
 
-- **[Rust](https://www.rust-lang.org/)** - Langage de programmation
+- **[Rust](https://www.rust-lang.org/)** - Langage
 - **[Axum](https://github.com/tokio-rs/axum)** - Framework web
 - **[Tokio](https://tokio.rs/)** - Runtime asynchrone
 - **[Diesel](https://diesel.rs/)** - ORM et query builder
 - **[PostgreSQL](https://www.postgresql.org/)** - Base de données
-- **[jsonwebtoken](https://github.com/Keats/jsonwebtoken)** - JWT
+- **[jsonwebtoken](https://github.com/Keats/jsonwebtoken)** - JWT HS256
 - **[bcrypt](https://github.com/Keats/rust-bcrypt)** - Hachage de mots de passe
-- **[lambda_http](https://github.com/awslabs/aws-lambda-rust-runtime)** - Runtime Lambda
-- **[Docker](https://www.docker.com/)** - Conteneurisation
+- **[lambda_http](https://github.com/awslabs/aws-lambda-rust-runtime)** - Adapter Lambda
 
 ### API Types (`auth-manager-api`)
 
 - **[Serde](https://serde.rs/)** - Sérialisation/désérialisation
 - **[UUID](https://github.com/uuid-rs/uuid)** - Identifiants uniques
 - **[Chrono](https://github.com/chronotope/chrono)** - Gestion des dates
-- **WASM-compatible** - Peut être compilé pour wasm32-unknown-unknown
+- **WASM-compatible** — compilable pour `wasm32-unknown-unknown`
 
 ## Architecture
 
-Le projet suit une **architecture multi-crate en couches strictes** :
-
 ### Structure Multi-Crate
 
-1. **`auth-manager-api`** (Crate WASM-compatible)
-   - Types publics partagés entre backend et frontend
-   - Dépendances minimales : serde, uuid, chrono uniquement
-   - Peut être importé dans des applications WASM
-
-2. **`auth-manager`** (Backend)
-   - Serveur HTTP/Lambda avec Axum
-   - Utilise `auth-manager-api` pour les types
-   - Contient toute la logique métier et persistance
+1. **`auth-manager-api`** — types partagés WASM-compatible (serde, uuid, chrono uniquement)
+2. **`auth-manager`** — serveur HTTP/Lambda avec toute la logique métier
 
 ### Couches Backend
 
-1. **Couche API Types** (`auth-manager-api` crate)
-   - Request/Response DTOs
-   - Format d'erreur
-   - Wrapper de réponse générique
-
-2. **Couche HTTP** (`src/handlers/`, `src/response.rs`)
-   - Gestionnaires de routes minimalistes
-   - Wrapper Axum pour les types API
-   - Mapping d'erreurs vers HTTP
-
-3. **Couche Service** (`src/auth/services.rs`)
-   - Logique métier et validation
-   - Orchestration JWT et mots de passe
-   - Coordination entre repositories
-
-4. **Couche Persistance** (`src/db/repositories/`)
-   - Accès base de données exclusif
-   - Queries Diesel isolées
-   - Pool de connexions
-
-### Séparation des Responsabilités
-
-- Les **handlers** ne contiennent aucune logique métier
-- Les **services** orchestrent toute la logique métier
-- Les **repositories** gèrent exclusivement l'accès aux données
-- Les **types API** sont indépendants du backend
+1. **API Types** (`auth-manager-api`) — DTOs Request/Response, format d'erreur
+2. **HTTP** (`src/handlers/`, `src/response.rs`) — handlers minimalistes, pas de logique métier
+3. **Service** (`src/auth/services.rs`) — toute la logique métier et authentification
+4. **Persistance** (`src/db/repositories/`) — queries Diesel isolées, pool r2d2
 
 ## Intégration Frontend
 
-Le crate `auth-manager-api` peut être utilisé dans des applications frontend Rust/WASM pour une communication type-safe avec l'API.
-
-### Installation
-
-Dans le `Cargo.toml` de votre frontend :
-
 ```toml
+# frontend Cargo.toml
 [dependencies]
 auth-manager-api = { path = "../auth-manager/auth-manager-api" }
 ```
 
-### Ce que le frontend reçoit
-
-**Inclus** ✅ :
-- Request DTOs : `RegisterRequest`, `LoginRequest`, `RefreshTokenRequest`, etc.
-- Response DTOs : `UserResponse`, `LoginResponse`, `RefreshTokenResponse`, etc.
-- Format d'erreur : `ErrorResponse`
-- Dépendances légères : serde, uuid, chrono
-
-**Exclu** ❌ :
-- Axum (framework web)
-- Diesel (ORM)
-- Tokio (runtime async)
-- Toute dépendance serveur
-
-### Exemple d'utilisation
-
-```rust
-use auth_manager_api::{LoginRequest, LoginResponse};
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen]
-pub async fn login(email: String, password: String) -> Result<JsValue, JsValue> {
-    let request = LoginRequest { email, password };
-
-    // Envoyer au backend via HTTP...
-    let response: LoginResponse = fetch_json("/auth/login", request).await?;
-
-    Ok(serde_wasm_bindgen::to_value(&response)?)
-}
-```
-
-### Build WASM
+Le frontend reçoit **uniquement** les DTOs et types légers — pas d'Axum, Diesel ou Tokio.
 
 ```bash
-# Installer la target WASM
-rustup target add wasm32-unknown-unknown
-
-# Vérifier la compatibilité
-cd auth-manager-api
-cargo build --target wasm32-unknown-unknown --release
+# Vérifier la compatibilité WASM
+cargo build --manifest-path auth-manager-api/Cargo.toml \
+  --target wasm32-unknown-unknown --release
 ```
 
 ## Sécurité
 
 - Mots de passe hachés avec bcrypt (coût configurable)
-- Tokens JWT signés et avec expiration
+- Tokens JWT signés avec expiration
 - Refresh tokens stockés sous forme de hash
 - Cookies HttpOnly pour les refresh tokens
 - CORS configurable
 - Validation des entrées
-- Pas de logs de données sensibles
-
-## Licence
-
-MIT
-
-## Support
-
-Pour toute question ou problème, ouvrez une issue sur le dépôt GitHub.
+- Aucun log de données sensibles
