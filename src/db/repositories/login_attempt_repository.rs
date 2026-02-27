@@ -28,7 +28,6 @@ impl LoginAttemptRepository {
     }
 
     /// Compter les tentatives échouées pour un user dans les X dernières minutes
-    #[allow(dead_code)]
     pub fn count_failed_attempts(user_id: Uuid, minutes: i64) -> Result<i64, RepositoryError> {
         let mut conn = get_connection()?;
 

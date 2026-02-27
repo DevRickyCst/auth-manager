@@ -15,6 +15,9 @@ use crate::db::repositories::user_repository::UserRepository;
 
 use chrono::Utc;
 
+const MAX_FAILED_ATTEMPTS: i64 = 5;
+const LOCKOUT_WINDOW_MINUTES: i64 = 15;
+
 pub struct AuthService {
     jwt_manager: super::jwt::JwtManager,
 }
@@ -149,6 +152,17 @@ impl AuthService {
             }
             Err(e) => return Err(AppError::from(e)),
         };
+
+        // Brute-force protection: vérifie le nombre de tentatives récentes
+        let failed_count =
+            LoginAttemptRepository::count_failed_attempts(user.id, LOCKOUT_WINDOW_MINUTES)
+                .unwrap_or(0);
+        if failed_count >= MAX_FAILED_ATTEMPTS {
+            return Err(AppError::TooManyAttempts(format!(
+                "Account temporarily locked after {} failed attempts. Try again in {} minutes.",
+                MAX_FAILED_ATTEMPTS, LOCKOUT_WINDOW_MINUTES
+            )));
+        }
 
         // Vérifie le password
         let password_hash = user
