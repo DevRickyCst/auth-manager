@@ -78,10 +78,22 @@ pub async fn refresh_token(
         .next()
         .ok_or_else(|| AppError::validation("Missing refresh_token cookie"))?;
 
-    let response = auth_service.refresh_token(RefreshTokenRequest {
+    let (response, new_refresh_hash) = auth_service.refresh_token(RefreshTokenRequest {
         refresh_token: refresh_hash,
     })?;
-    Ok(AppResponse::ok(response))
+
+    let cookie_val = format!(
+        "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh",
+        new_refresh_hash
+    );
+    let mut out_headers = HeaderMap::new();
+    out_headers.insert(
+        axum::http::header::SET_COOKIE,
+        HeaderValue::from_str(&cookie_val)
+            .map_err(|_| AppError::internal("Failed to set cookie"))?,
+    );
+
+    Ok(AppResponse::ok(response).with_headers(out_headers))
 }
 
 /// POST /auth/logout

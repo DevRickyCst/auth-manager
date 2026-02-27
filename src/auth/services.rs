@@ -216,7 +216,7 @@ impl AuthService {
     pub fn refresh_token(
         &self,
         refresh_token_request: RefreshTokenRequest,
-    ) -> Result<RefreshTokenResponse, AppError> {
+    ) -> Result<(RefreshTokenResponse, String), AppError> {
         if refresh_token_request.refresh_token.is_empty() {
             return Err(AppError::InvalidRefreshToken);
         }
@@ -247,16 +247,19 @@ impl AuthService {
 
         let new_refresh_token = NewRefreshToken {
             user_id: old_token.user_id,
-            token_hash: new_refresh_token_hash,
+            token_hash: new_refresh_token_hash.clone(),
             expires_at: Utc::now() + chrono::Duration::days(7),
         };
 
         RefreshTokenRepository::create(&new_refresh_token)?;
 
-        Ok(RefreshTokenResponse {
-            access_token,
-            expires_in: self.jwt_manager.expiration_hours() * 3600,
-        })
+        Ok((
+            RefreshTokenResponse {
+                access_token,
+                expires_in: self.jwt_manager.expiration_hours() * 3600,
+            },
+            new_refresh_token_hash,
+        ))
     }
 
     // === Helpers de validation ===
