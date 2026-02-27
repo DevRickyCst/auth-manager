@@ -103,12 +103,12 @@ impl AuthService {
         }
 
         // Validation password
-        //if !Self::is_strong_password(&register_request.password) {
-        //    return Err(AppError::WeakPassword(
-        //        "Password must be at least 8 characters with uppercase, lowercase and numbers"
-        //            .to_string(),
-        //    ));
-        //}
+        if !Self::is_strong_password(&register_request.password) {
+            return Err(AppError::WeakPassword(
+                "Password must be at least 8 characters with uppercase, lowercase and numbers"
+                    .to_string(),
+            ));
+        }
 
         // Vérifier que l'email n'existe pas
         let user = UserRepository::find_by_email(&register_request.email)?;
@@ -316,7 +316,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_register_weak_password() {
         let register_request = RegisterRequest {
             email: "test@example.com".to_string(),
