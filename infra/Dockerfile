@@ -16,11 +16,13 @@ COPY Cargo.toml Cargo.lock ./
 # Copy auth-manager-api workspace (required dependency)
 COPY auth-manager-api ./auth-manager-api
 
-# Create dummy src to cache dependencies
+# Create dummy src to cache dependencies, then remove dummy binary artifacts
+# (keeps deps compiled, forces main crate recompile with real source)
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
     cargo build --release && \
-    rm -rf src
+    rm -rf src target/release/auth-manager target/release/deps/auth_manager* \
+           target/release/.fingerprint/auth-manager*
 
 # Copy actual source code
 COPY src ./src
