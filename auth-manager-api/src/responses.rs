@@ -21,7 +21,7 @@ pub struct LoginResponse {
 }
 
 /// Public login response (does not include refresh token)
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PublicLoginResponse {
     pub access_token: String,
     pub user: UserResponse,
