@@ -63,6 +63,7 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
     let mut allowed_origins = vec![
         "http://localhost:8080".parse().expect("Invalid origin"),
         "http://127.0.0.1:8080".parse().expect("Invalid origin"),
+        "http://0.0.0.0:8080".parse().expect("Invalid origin"),
     ];
 
     // Ajouter l'URL frontend (production ou autre)
