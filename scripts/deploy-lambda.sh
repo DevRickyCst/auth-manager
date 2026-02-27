@@ -449,7 +449,10 @@ main() {
         print_warning "Skipping Docker build (--skip-build)"
     fi
 
-    # Update Lambda function
+    # Deploy SAM stack (applies any template.yaml changes to API Gateway, IAM, etc.)
+    deploy_sam_stack
+
+    # Update Lambda function with the new image
     update_lambda_image
 
     # Show outputs

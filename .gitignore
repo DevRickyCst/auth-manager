@@ -5,6 +5,11 @@ target/
 # IDE
 .vscode/
 .idea/
+
+# Claude Code / AI agents
+.claude/
+.agents/
+skills-lock.json
 *.swp
 *.swo
 

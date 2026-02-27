@@ -41,7 +41,7 @@ pub async fn login(
 
     // Refresh token hash en cookie HttpOnly uniquement — jamais dans le body
     let cookie_val = format!(
-        "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh",
+        "refresh_token={}; HttpOnly; Secure; SameSite=None; Path=/auth/refresh",
         refresh_hash
     );
     let mut out_headers = HeaderMap::new();
@@ -83,7 +83,7 @@ pub async fn refresh_token(
     })?;
 
     let cookie_val = format!(
-        "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh",
+        "refresh_token={}; HttpOnly; Secure; SameSite=None; Path=/auth/refresh",
         new_refresh_hash
     );
     let mut out_headers = HeaderMap::new();
