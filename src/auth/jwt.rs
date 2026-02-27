@@ -14,14 +14,25 @@ pub struct Claims {
 pub struct JwtManager {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
+    expiration_hours: i64,
 }
 
 impl JwtManager {
-    pub fn new(secret: &str) -> Self {
+    pub fn new(secret: &str, expiration_hours: i64) -> Self {
         Self {
             encoding_key: EncodingKey::from_secret(secret.as_ref()),
             decoding_key: DecodingKey::from_secret(secret.as_ref()),
+            expiration_hours,
         }
+    }
+
+    /// Génère un access token avec la durée configurée
+    pub fn generate_access_token(&self, user_id: Uuid) -> Result<String, String> {
+        self.generate_token(user_id, self.expiration_hours)
+    }
+
+    pub fn expiration_hours(&self) -> i64 {
+        self.expiration_hours
     }
 
     pub fn generate_token(&self, user_id: Uuid, expires_in_hours: i64) -> Result<String, String> {
@@ -69,7 +80,7 @@ mod tests {
 // ============================================
 #[cfg(test)]
 fn get_jwt_manager() -> JwtManager {
-    JwtManager::new("my_secret_key_for_tests")
+    JwtManager::new("my_secret_key_for_tests", 1)
 }
 
 // ============================================

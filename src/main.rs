@@ -59,7 +59,7 @@ async fn main() -> Result<(), lambda_http::Error> {
     tracing::info!("✅ Database connection pool initialized");
 
     // Create JWT manager
-    let jwt_manager = auth::jwt::JwtManager::new(&config.jwt_secret);
+    let jwt_manager = auth::jwt::JwtManager::new(&config.jwt_secret, config.jwt_expiration_hours);
 
     // Build router
     let app = build_router(jwt_manager);

@@ -114,7 +114,7 @@ mod tests {
 
     fn test_jwt() -> JwtManager {
         init_test_pool();
-        JwtManager::new("test_secret_for_auth_routes")
+        JwtManager::new("test_secret_for_auth_routes", 1)
     }
 
     #[tokio::test]

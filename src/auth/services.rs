@@ -180,7 +180,7 @@ impl AuthService {
         // Génère les tokens
         let access_token = self
             .jwt_manager
-            .generate_token(user.id, 1)
+            .generate_access_token(user.id)
             .map_err(AppError::token_generation_failed)?;
 
         let refresh_token = uuid::Uuid::new_v4().to_string();
@@ -206,7 +206,7 @@ impl AuthService {
             access_token,
             refresh_token,
             user: user.into(),
-            expires_in: 3600,
+            expires_in: self.jwt_manager.expiration_hours() * 3600,
         };
 
         Ok((resp, refresh_token_hash))
@@ -234,7 +234,7 @@ impl AuthService {
         // Génère un nouveau access token
         let access_token = self
             .jwt_manager
-            .generate_token(old_token.user_id, 1)
+            .generate_access_token(old_token.user_id)
             .map_err(AppError::token_generation_failed)?;
 
         // Supprime l'ancien refresh token
@@ -255,7 +255,7 @@ impl AuthService {
 
         Ok(RefreshTokenResponse {
             access_token,
-            expires_in: 3600,
+            expires_in: self.jwt_manager.expiration_hours() * 3600,
         })
     }
 
@@ -351,7 +351,7 @@ mod tests {
 
         AuthService::register(register_request).expect("Registration should succeed");
 
-        let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key");
+        let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key", 1);
         let auth_service = AuthService::new(jwt_manager);
 
         let login_request = LoginRequest {
@@ -373,7 +373,7 @@ mod tests {
         let register_request = create_test_register_request();
         let user = AuthService::register(register_request).expect("Registration should succeed");
 
-        let jwt_manager = crate::auth::jwt::JwtManager::new("default_secret");
+        let jwt_manager = crate::auth::jwt::JwtManager::new("default_secret", 1);
         let auth_service = AuthService::new(jwt_manager);
 
         let login_request = LoginRequest {
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn test_login_user_not_found() {
         init_test_pool();
-        let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key");
+        let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key", 1);
         let auth_service = AuthService::new(jwt_manager);
 
         let login_request = LoginRequest {
@@ -415,7 +415,7 @@ mod tests {
         let user = UserRepository::create(&new_user).expect("create user");
 
         // Change password via service
-        let jwt_manager = crate::auth::jwt::JwtManager::new("svc_secret");
+        let jwt_manager = crate::auth::jwt::JwtManager::new("svc_secret", 1);
         let svc = AuthService::new(jwt_manager);
         let result = svc.change_password(user.id, "OldPass123!", "NewPass456!");
         assert!(result.is_ok(), "Change password should succeed");
@@ -442,7 +442,7 @@ mod tests {
         };
         let user = UserRepository::create(&new_user).expect("create user");
 
-        let jwt_manager = crate::auth::jwt::JwtManager::new("svc_secret");
+        let jwt_manager = crate::auth::jwt::JwtManager::new("svc_secret", 1);
         let svc = AuthService::new(jwt_manager);
         let result = svc.change_password(user.id, "WrongOld!", "NewPass456!");
         assert!(result.is_err(), "Should fail with invalid old password");

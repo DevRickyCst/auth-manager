@@ -44,8 +44,7 @@ pub struct Config {
     pub environment: Environment,
     pub database_url: String,
     pub jwt_secret: String,
-    #[allow(dead_code)]
-    pub jwt_expiration: String,
+    pub jwt_expiration_hours: i64,
     #[allow(dead_code)]
     pub frontend_url: String,
     pub server_host: String,
@@ -69,7 +68,10 @@ impl Config {
         // Récupérer les variables avec fallbacks intelligents
         let database_url = Self::get_database_url(&environment)?;
         let jwt_secret = Self::get_jwt_secret(&environment)?;
-        let jwt_expiration = env::var("JWT_EXPIRATION").unwrap_or_else(|_| "7d".to_string());
+        let jwt_expiration_hours = env::var("JWT_EXPIRATION_HOURS")
+            .unwrap_or_else(|_| "1".to_string())
+            .parse::<i64>()
+            .unwrap_or(1);
         let frontend_url = Self::get_frontend_url(&environment);
         let server_host = env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let server_port = env::var("SERVER_PORT")
@@ -86,7 +88,7 @@ impl Config {
             environment,
             database_url,
             jwt_secret,
-            jwt_expiration,
+            jwt_expiration_hours,
             frontend_url,
             server_host,
             server_port,

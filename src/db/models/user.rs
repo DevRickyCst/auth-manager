@@ -42,7 +42,7 @@ impl From<User> for UserResponse {
     }
 }
 
-#[derive(AsChangeset, Debug, Clone)]
+#[derive(AsChangeset, Debug, Clone, Default)]
 #[diesel(table_name = users)]
 pub struct UpdateUser {
     pub email_verified: Option<bool>,

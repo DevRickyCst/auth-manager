@@ -1,6 +1,6 @@
 use crate::db::connection::get_connection;
 use crate::db::error::RepositoryError;
-use crate::db::models::user::{NewUser, User};
+use crate::db::models::user::{NewUser, UpdateUser, User};
 use crate::db::schema::users;
 use diesel::prelude::*;
 use uuid::Uuid;
@@ -41,12 +41,11 @@ impl UserRepository {
 
     /// Mettre à jour le dernier login
     pub fn update_last_login(id: Uuid) -> Result<(), RepositoryError> {
-        let mut conn = get_connection()?;
-
-        diesel::update(users::table.filter(users::id.eq(id)))
-            .set(users::last_login_at.eq(chrono::Utc::now()))
-            .execute(&mut conn)?;
-
+        let changes = UpdateUser {
+            last_login_at: Some(Some(chrono::Utc::now())),
+            ..Default::default()
+        };
+        Self::update(id, &changes)?;
         Ok(())
     }
 
@@ -59,6 +58,16 @@ impl UserRepository {
             .execute(&mut conn)?;
 
         Ok(())
+    }
+
+    /// Mettre à jour un utilisateur (email_verified, is_active, last_login_at)
+    pub fn update(id: Uuid, changes: &UpdateUser) -> Result<User, RepositoryError> {
+        let mut conn = get_connection()?;
+
+        diesel::update(users::table.filter(users::id.eq(id)))
+            .set(changes)
+            .get_result::<User>(&mut conn)
+            .map_err(Into::into)
     }
 
     /// Supprimer un utilisateur
