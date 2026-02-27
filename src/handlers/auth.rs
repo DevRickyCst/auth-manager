@@ -5,7 +5,7 @@ use crate::auth::services::AuthService;
 use crate::error::AppError;
 use crate::response::AppResponse;
 use auth_manager_api::{
-    LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
+    LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
     UserResponse,
 };
 use axum::extract::{Extension, State};
@@ -30,7 +30,7 @@ pub async fn login(
     State(auth_service): State<Arc<AuthService>>,
     headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
-) -> Result<AppResponse<LoginResponse>, AppError> {
+) -> Result<AppResponse<PublicLoginResponse>, AppError> {
     // Récupère le User-Agent s'il existe
     let user_agent = headers
         .get("user-agent")
@@ -39,7 +39,7 @@ pub async fn login(
 
     let (response, refresh_hash) = auth_service.login(payload, user_agent)?;
 
-    // Build Set-Cookie header for refresh token hash
+    // Refresh token hash en cookie HttpOnly uniquement — jamais dans le body
     let cookie_val = format!(
         "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh",
         refresh_hash
@@ -51,8 +51,7 @@ pub async fn login(
             .map_err(|_| AppError::internal("Failed to set cookie"))?,
     );
 
-    // Return full LoginResponse including refresh_token in body (for WASM compatibility)
-    Ok(AppResponse::ok(response).with_headers(out_headers))
+    Ok(AppResponse::ok(PublicLoginResponse::from(response)).with_headers(out_headers))
 }
 
 /// POST /auth/refresh
