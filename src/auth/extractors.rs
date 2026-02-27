@@ -10,9 +10,9 @@ use crate::error::AppError;
 #[derive(Debug, Clone)]
 pub struct AuthClaims {
     pub sub: uuid::Uuid,
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "JWT standard claim; available for future token introspection")]
     pub iat: i64,
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "JWT standard claim; available for future token introspection")]
     pub exp: i64,
 }
 

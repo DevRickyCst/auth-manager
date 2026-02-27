@@ -26,7 +26,6 @@ impl Environment {
         matches!(self, Self::Production)
     }
 
-    #[allow(dead_code)]
     pub fn is_development(&self) -> bool {
         matches!(self, Self::Development)
     }
@@ -45,7 +44,7 @@ pub struct Config {
     pub database_url: String,
     pub jwt_secret: String,
     pub jwt_expiration_hours: i64,
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "CORS origin is consumed at startup in app.rs; field retained for completeness")]
     pub frontend_url: String,
     pub server_host: String,
     pub server_port: u16,
@@ -151,15 +150,17 @@ impl Config {
 
     /// Récupère JWT_SECRET avec validation
     fn get_jwt_secret(environment: &Environment) -> Result<String> {
-        let secret = env::var("JWT_SECRET").unwrap_or_else(|_| {
-            if environment.is_production() {
+        let secret = match env::var("JWT_SECRET") {
+            Ok(s) => s,
+            Err(_) if environment.is_production() => {
                 tracing::error!("❌ JWT_SECRET not set in production!");
-                panic!("JWT_SECRET is required in production");
-            } else {
+                anyhow::bail!("JWT_SECRET is required in production");
+            }
+            Err(_) => {
                 tracing::warn!("⚠️  JWT_SECRET not set, using default (DEVELOPMENT ONLY!)");
                 "dev_secret_key_change_in_production".to_string()
             }
-        });
+        };
 
         // Valider la longueur du secret en production
         if environment.is_production() && secret.len() < 32 {
@@ -201,7 +202,7 @@ impl Config {
     }
 
     /// Retourne true si on est en mode développement
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Available for conditional behavior in request handlers")]
     pub fn is_development(&self) -> bool {
         self.environment.is_development()
     }
@@ -212,7 +213,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_environment_detection_lambda() {
+    fn environment_detects_production_for_lambda() {
         unsafe {
             env::set_var("AWS_LAMBDA_FUNCTION_NAME", "test-function");
         }
@@ -223,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn test_environment_detection_app_env() {
+    fn environment_respects_app_env_variable() {
         unsafe {
             env::set_var("APP_ENV", "production");
         }
@@ -242,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn test_environment_detection_default() {
+    fn environment_defaults_to_development() {
         unsafe {
             env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
             env::remove_var("APP_ENV");
@@ -251,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mask_credentials() {
+    fn mask_credentials_hides_password_in_url() {
         let url = "postgres://user:password@localhost:5432/db";
         let masked = Config::mask_credentials(url);
         assert_eq!(masked, "postgres://***:***@localhost:5432/db");

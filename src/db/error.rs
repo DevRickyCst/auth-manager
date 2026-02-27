@@ -1,32 +1,17 @@
-use std::fmt;
-
 /// Repository layer errors
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum RepositoryError {
+    #[error("Connection pool error: {0}")]
     PoolError(String),
+    #[error("Not found: {0}")]
     NotFound(String),
+    #[error("Unique constraint violation: {0}")]
     UniqueViolation(String),
+    #[error("Foreign key constraint violation: {0}")]
     ForeignKeyViolation(String),
+    #[error("Database error: {0}")]
     DatabaseError(String),
 }
-
-impl fmt::Display for RepositoryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RepositoryError::PoolError(msg) => write!(f, "Connection pool error: {}", msg),
-            RepositoryError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            RepositoryError::UniqueViolation(msg) => {
-                write!(f, "Unique constraint violation: {}", msg)
-            }
-            RepositoryError::ForeignKeyViolation(msg) => {
-                write!(f, "Foreign key constraint violation: {}", msg)
-            }
-            RepositoryError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RepositoryError {}
 
 impl From<diesel::result::Error> for RepositoryError {
     fn from(err: diesel::result::Error) -> Self {

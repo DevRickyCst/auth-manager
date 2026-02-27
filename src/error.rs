@@ -6,86 +6,55 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AppError {
     // === Erreurs Repository ===
+    #[error("Not found: {0}")]
     NotFound(String),
+    #[error("Already exists: {0}")]
     Duplicate(String),
+    #[error("Database error: {0}")]
     DatabaseError(String),
 
     // === Erreurs d'Authentification ===
+    #[error("Invalid password")]
     InvalidPassword,
+    #[error("Email already exists")]
     UserAlreadyExists,
+    #[error("Invalid refresh token")]
     InvalidRefreshToken,
+    #[error("Refresh token expired")]
     RefreshTokenExpired,
+    #[error("Invalid email format")]
     InvalidEmail,
+    #[error("Password too weak: {0}")]
     WeakPassword(String),
 
     // === Erreurs de Hashing/Cryptographie ===
+    #[error("Password hashing failed: {0}")]
     PasswordHashingFailed(String),
+    #[error("Token generation failed: {0}")]
     TokenGenerationFailed(String),
+    #[error("Invalid token format")]
     InvalidTokenFormat,
 
     // === Erreurs de Validation ===
+    #[error("Validation error: {0}")]
     ValidationError(String),
-    #[allow(dead_code)]
-    MissingField(String),
+    #[error("Invalid input: {0}")]
     InvalidInput(String),
 
     // === Erreurs métier ===
+    #[error("Unauthorized: {0}")]
     UnauthorizedAction(String),
-    #[allow(dead_code)]
-    ResourceLocked(String),
-    #[allow(dead_code)]
+    #[error("Too many attempts: {0}")]
     TooManyAttempts(String),
 
     // === Erreurs internes ===
+    #[error("Internal server error: {0}")]
     InternalServerError(String),
-    #[allow(dead_code)]
-    ConfigurationError(String),
 }
-
-impl fmt::Display for AppError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            // Repository
-            AppError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            AppError::Duplicate(msg) => write!(f, "Already exists: {}", msg),
-            AppError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-
-            // Auth
-            AppError::InvalidPassword => write!(f, "Invalid password"),
-            AppError::UserAlreadyExists => write!(f, "Email already exists"),
-            AppError::InvalidRefreshToken => write!(f, "Invalid refresh token"),
-            AppError::RefreshTokenExpired => write!(f, "Refresh token expired"),
-            AppError::InvalidEmail => write!(f, "Invalid email format"),
-            AppError::WeakPassword(msg) => write!(f, "Password too weak: {}", msg),
-
-            // Crypto
-            AppError::PasswordHashingFailed(msg) => write!(f, "Password hashing failed: {}", msg),
-            AppError::TokenGenerationFailed(msg) => write!(f, "Token generation failed: {}", msg),
-            AppError::InvalidTokenFormat => write!(f, "Invalid token format"),
-
-            // Validation
-            AppError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
-            AppError::MissingField(field) => write!(f, "Missing required field: {}", field),
-            AppError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
-
-            // Business
-            AppError::UnauthorizedAction(msg) => write!(f, "Unauthorized: {}", msg),
-            AppError::ResourceLocked(msg) => write!(f, "Resource locked: {}", msg),
-            AppError::TooManyAttempts(msg) => write!(f, "Too many attempts: {}", msg),
-
-            // Internal
-            AppError::InternalServerError(msg) => write!(f, "Internal server error: {}", msg),
-            AppError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for AppError {}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
@@ -162,12 +131,6 @@ impl AppError {
                 msg.clone(),
                 None,
             ),
-            AppError::MissingField(field) => (
-                StatusCode::BAD_REQUEST,
-                "MISSING_FIELD",
-                format!("Missing required field: {}", field),
-                None,
-            ),
             AppError::InvalidInput(msg) => {
                 (StatusCode::BAD_REQUEST, "INVALID_INPUT", msg.clone(), None)
             }
@@ -185,11 +148,6 @@ impl AppError {
                 msg.clone(),
                 None,
             ),
-
-            // 423 Locked
-            AppError::ResourceLocked(msg) => {
-                (StatusCode::LOCKED, "RESOURCE_LOCKED", msg.clone(), None)
-            }
 
             // 500 Internal Server Error
             AppError::PasswordHashingFailed(msg) => (
@@ -216,12 +174,6 @@ impl AppError {
                 "An internal server error occurred".to_string(),
                 Some(msg.clone()),
             ),
-            AppError::ConfigurationError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "CONFIG_ERROR",
-                "Server configuration error".to_string(),
-                Some(msg.clone()),
-            ),
         }
     }
 
@@ -246,11 +198,6 @@ impl AppError {
         AppError::ValidationError(msg.into())
     }
 
-    #[allow(dead_code)]
-    pub fn missing_field(field: impl Into<String>) -> Self {
-        AppError::MissingField(field.into())
-    }
-
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         AppError::InvalidInput(msg.into())
     }
@@ -259,7 +206,7 @@ impl AppError {
         AppError::UnauthorizedAction(msg.into())
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Planned for rate limiting feature")]
     pub fn too_many_attempts(msg: impl Into<String>) -> Self {
         AppError::TooManyAttempts(msg.into())
     }
@@ -273,7 +220,7 @@ impl AppError {
     }
 
     /// Retourne le code de statut HTTP
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Used in unit tests")]
     pub fn status_code(&self) -> StatusCode {
         self.get_error_info().0
     }
@@ -290,6 +237,18 @@ impl From<crate::db::error::RepositoryError> for AppError {
             crate::db::error::RepositoryError::PoolError(msg) => AppError::database(&msg),
             crate::db::error::RepositoryError::ForeignKeyViolation(msg) => AppError::database(&msg),
             crate::db::error::RepositoryError::DatabaseError(msg) => AppError::database(&msg),
+        }
+    }
+}
+
+// Depuis JwtError
+impl From<crate::auth::jwt::JwtError> for AppError {
+    fn from(err: crate::auth::jwt::JwtError) -> Self {
+        match err {
+            crate::auth::jwt::JwtError::GenerationFailed(e) => {
+                AppError::token_generation_failed(e.to_string())
+            }
+            crate::auth::jwt::JwtError::VerificationFailed(_) => AppError::InvalidRefreshToken,
         }
     }
 }
@@ -348,13 +307,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_error_display() {
+    fn not_found_displays_correct_message() {
         let err = AppError::not_found("User");
         assert_eq!(err.to_string(), "Not found: User");
     }
 
     #[test]
-    fn test_not_found_status() {
+    fn not_found_maps_to_404_status() {
         assert_eq!(
             AppError::not_found("test").status_code(),
             StatusCode::NOT_FOUND
@@ -362,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unauthorized_status() {
+    fn invalid_password_maps_to_401_status() {
         assert_eq!(
             AppError::InvalidPassword.status_code(),
             StatusCode::UNAUTHORIZED
@@ -370,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validation_status() {
+    fn validation_error_maps_to_400_status() {
         assert_eq!(
             AppError::validation("test").status_code(),
             StatusCode::BAD_REQUEST
@@ -378,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn test_internal_status() {
+    fn internal_error_maps_to_500_status() {
         assert_eq!(
             AppError::internal("test").status_code(),
             StatusCode::INTERNAL_SERVER_ERROR
@@ -386,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_too_many_attempts_status() {
+    fn too_many_attempts_maps_to_429_status() {
         assert_eq!(
             AppError::too_many_attempts("limit exceeded").status_code(),
             StatusCode::TOO_MANY_REQUESTS
@@ -394,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn test_error_response() {
+    fn not_found_into_response_sets_404_status() {
         let err = AppError::not_found("User");
         let response = err.into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);

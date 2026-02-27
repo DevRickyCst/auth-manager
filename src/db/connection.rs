@@ -46,19 +46,6 @@ pub fn get_connection() -> Result<DbConnection, RepositoryError> {
 }
 
 #[cfg(test)]
-#[allow(dead_code)]
-pub fn create_pool() -> Result<DbPool> {
-    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
-
-    let manager = ConnectionManager::<PgConnection>::new(&database_url);
-
-    diesel::r2d2::Pool::builder()
-        .max_size(5)
-        .build(manager)
-        .context("Failed to create pool")
-}
-
-#[cfg(test)]
 pub fn init_test_pool() {
     use std::sync::Once;
     static INIT: Once = Once::new();
@@ -75,7 +62,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pool_initialization() {
+    fn pool_initializes_successfully() {
         init_test_pool();
         // Pool should now be initialized or skip if DATABASE_URL not set
     }

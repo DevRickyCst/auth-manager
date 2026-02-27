@@ -17,7 +17,7 @@ mod tests {
     use super::PasswordManager;
 
     #[test]
-    fn test_password_hash_and_verify() {
+    fn hash_and_verify_succeeds_with_correct_password() {
         let password = "secure_password_@123P";
         let hashed = PasswordManager::hash(password).expect("Hashing failed");
 
@@ -28,7 +28,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_users_different_hashes() {
+    fn hash_produces_unique_hashes_for_same_password() {
         let password1 = "user1_password";
         let password2 = "user2_password";
 
@@ -43,7 +43,7 @@ mod tests {
         assert!(!PasswordManager::verify(password2, &hash1).unwrap());
     }
     #[test]
-    fn test_verify_case_sensitive() {
+    fn verify_fails_when_case_differs() {
         let password = "MyPassword";
         let hash = PasswordManager::hash(password).unwrap();
 

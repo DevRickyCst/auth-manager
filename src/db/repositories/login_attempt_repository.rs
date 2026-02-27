@@ -44,7 +44,7 @@ impl LoginAttemptRepository {
     }
 
     /// Récupérer les dernières tentatives d'un user
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Planned for login history endpoint")]
     pub fn find_by_user(user_id: Uuid, limit: i64) -> Result<Vec<LoginAttempt>, RepositoryError> {
         let mut conn = get_connection()?;
 

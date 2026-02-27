@@ -8,7 +8,7 @@ use auth_manager_api::{
     LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
     UserResponse,
 };
-use axum::extract::{Extension, State};
+use axum::extract::Extension;
 use axum::{
     Json,
     http::{HeaderMap, HeaderValue},
@@ -27,7 +27,7 @@ pub async fn register(
 /// POST /auth/login
 /// Connexion d'un utilisateur
 pub async fn login(
-    State(auth_service): State<Arc<AuthService>>,
+    Extension(auth_service): Extension<Arc<AuthService>>,
     headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
 ) -> Result<AppResponse<PublicLoginResponse>, AppError> {
@@ -57,7 +57,7 @@ pub async fn login(
 /// POST /auth/refresh
 /// Rafraîchissement des tokens
 pub async fn refresh_token(
-    State(auth_service): State<Arc<AuthService>>,
+    Extension(auth_service): Extension<Arc<AuthService>>,
     headers: HeaderMap,
 ) -> Result<AppResponse<RefreshTokenResponse>, AppError> {
     // Read refresh_token hash from Cookie header

@@ -28,10 +28,7 @@ impl AuthService {
     }
 
     pub fn get_current_user(&self, user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
-        UserRepository::find_by_id(user_id)
-            .map_err(AppError::from)?
-            .map(UserResponse::from)
-            .ok_or_else(|| AppError::not_found("User"))
+        self.get_user_by_id(user_id)
     }
 
     /// Déconnexion: révoque tous les refresh tokens de l'utilisateur
@@ -121,8 +118,8 @@ impl AuthService {
             .map_err(AppError::hashing_failed)?;
 
         let new_user = NewUser {
-            email: register_request.email.to_string(),
-            username: register_request.username.to_string(),
+            email: register_request.email,
+            username: register_request.username,
             password_hash: Some(password_hash),
         };
 
@@ -173,7 +170,7 @@ impl AuthService {
         if !super::password::PasswordManager::verify(&login_request.password, password_hash)
             .map_err(AppError::hashing_failed)?
         {
-            let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent.clone());
+            let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent);
             return Err(AppError::InvalidPassword);
         }
 
@@ -181,7 +178,7 @@ impl AuthService {
         let access_token = self
             .jwt_manager
             .generate_access_token(user.id)
-            .map_err(AppError::token_generation_failed)?;
+            .map_err(AppError::from)?;
 
         let refresh_token = uuid::Uuid::new_v4().to_string();
         let refresh_token_hash = super::password::PasswordManager::hash(&refresh_token)
@@ -235,10 +232,12 @@ impl AuthService {
         let access_token = self
             .jwt_manager
             .generate_access_token(old_token.user_id)
-            .map_err(AppError::token_generation_failed)?;
+            .map_err(AppError::from)?;
 
         // Supprime l'ancien refresh token
-        let _ = RefreshTokenRepository::delete(old_token.id);
+        RefreshTokenRepository::delete(old_token.id)
+            .inspect_err(|e| tracing::error!("Failed to delete old refresh token {}: {e}", old_token.id))
+            .ok();
 
         // Crée un nouveau refresh token
         let new_refresh_token_str = uuid::Uuid::new_v4().to_string();
@@ -296,18 +295,19 @@ mod tests {
     }
 
     #[test]
-    fn test_register_success() {
+    fn register_succeeds_with_valid_data() {
         let register_request = create_test_register_request();
+        let email = register_request.email.clone();
         let user = AuthService::register(register_request).expect("Registration should succeed");
 
-        let result = UserRepository::find_by_email("test@example.com");
+        let result = UserRepository::find_by_email(&email);
         assert!(result.is_ok(), "Should find the newly registered user");
 
         let _ = UserRepository::delete(user.id);
     }
 
     #[test]
-    fn test_register_invalid_email() {
+    fn register_fails_when_email_is_invalid() {
         let register_request = RegisterRequest {
             email: "invalid-email".to_string(),
             username: "testuser".to_string(),
@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn test_register_weak_password() {
+    fn register_fails_when_password_is_weak() {
         let register_request = RegisterRequest {
             email: "test@example.com".to_string(),
             username: "testuser".to_string(),
@@ -331,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn test_register_duplicate_email() {
+    fn register_fails_when_email_already_exists() {
         let register_request = create_test_register_request();
 
         // Première inscription
@@ -346,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn test_login_success() {
+    fn login_succeeds_with_valid_credentials() {
         let register_request = create_test_register_request();
 
         let email = register_request.email.clone();
@@ -372,15 +372,16 @@ mod tests {
     }
 
     #[test]
-    fn test_login_invalid_password() {
+    fn login_fails_with_wrong_password() {
         let register_request = create_test_register_request();
+        let email = register_request.email.clone();
         let user = AuthService::register(register_request).expect("Registration should succeed");
 
         let jwt_manager = crate::auth::jwt::JwtManager::new("default_secret", 1);
         let auth_service = AuthService::new(jwt_manager);
 
         let login_request = LoginRequest {
-            email: "test@example.com".to_string(),
+            email,
             password: "WrongPassword123!".to_string(),
         };
 
@@ -391,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn test_login_user_not_found() {
+    fn login_fails_when_user_not_found() {
         init_test_pool();
         let jwt_manager = crate::auth::jwt::JwtManager::new("secret_key", 1);
         let auth_service = AuthService::new(jwt_manager);
@@ -406,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn test_change_password_success() {
+    fn change_password_succeeds_with_correct_old_password() {
         init_test_pool();
         // Create user with known password
         let old_hash = PasswordManager::hash("OldPass123!").expect("hash");
@@ -435,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn test_change_password_wrong_old() {
+    fn change_password_fails_when_old_password_is_wrong() {
         init_test_pool();
         let old_hash = PasswordManager::hash("OldPass123!").expect("hash");
         let new_user = NewUser {
