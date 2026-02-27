@@ -89,12 +89,16 @@ impl std::error::Error for AppError {}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, error_code, message, details) = self.get_error_info();
+        let (status, error_code, message, internal_detail) = self.get_error_info();
+
+        if let Some(ref detail) = internal_detail {
+            tracing::error!(error_code, %status, detail, "Internal server error");
+        }
 
         let body = Json(ErrorResponse {
             error: error_code.to_string(),
             message,
-            details,
+            details: None,
         });
 
         (status, body).into_response()
