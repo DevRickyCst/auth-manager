@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn test_jwt_generate_and_verify() {
         let secret = "my_secret_key";
-        let jwt_manager = JwtManager::new(secret);
+        let jwt_manager = JwtManager::new(secret, 1);
         let user_id = uuid::Uuid::new_v4();
         let token = jwt_manager
             .generate_token(user_id, 1)
