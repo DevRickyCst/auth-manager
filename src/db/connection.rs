@@ -24,7 +24,10 @@ pub fn init_pool_with_url(database_url: &str) -> Result<()> {
 
 /// Initialize the `PostgreSQL` connection pool using `DATABASE_URL` env var.
 /// This should be called once at application startup.
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "Kept as a convenience wrapper; used in local tooling, not the Lambda binary"
+)]
 pub fn init_pool() -> Result<()> {
     let url = std::env::var("DATABASE_URL").context("DATABASE_URL env var not set")?;
     init_pool_with_url(&url)

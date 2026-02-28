@@ -93,10 +93,10 @@ mod tests {
             .generate_token(user_id, 1)
             .expect("Token generation should succeed");
 
-        assert!(!token.is_empty(), "Token should not be empty");
-        assert!(
-            token.contains('.'),
-            "JWT should have dots (header.payload.signature)"
+        assert_eq!(
+            token.split('.').count(),
+            3,
+            "JWT must have exactly 3 parts: header.payload.signature"
         );
     }
 
