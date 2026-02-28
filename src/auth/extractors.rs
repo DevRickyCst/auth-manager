@@ -10,9 +10,15 @@ use crate::error::AppError;
 #[derive(Debug, Clone)]
 pub struct AuthClaims {
     pub sub: uuid::Uuid,
-    #[expect(dead_code, reason = "JWT standard claim; available for future token introspection")]
+    #[expect(
+        dead_code,
+        reason = "JWT standard claim; available for future token introspection"
+    )]
     pub iat: i64,
-    #[expect(dead_code, reason = "JWT standard claim; available for future token introspection")]
+    #[expect(
+        dead_code,
+        reason = "JWT standard claim; available for future token introspection"
+    )]
     pub exp: i64,
 }
 
@@ -34,6 +40,8 @@ impl FromRequestParts<JwtManager> for AuthClaims {
         parts: &mut Parts,
         jwt_manager: &JwtManager,
     ) -> Result<Self, Self::Rejection> {
+        const BEARER: &str = "Bearer ";
+
         // Récupère le header Authorization
         let auth_header = parts
             .headers
@@ -45,7 +53,6 @@ impl FromRequestParts<JwtManager> for AuthClaims {
             .map_err(|_| AppError::InvalidTokenFormat)?;
 
         // Doit être de type Bearer
-        const BEARER: &str = "Bearer ";
         if !auth_str.starts_with(BEARER) {
             return Err(AppError::InvalidTokenFormat);
         }

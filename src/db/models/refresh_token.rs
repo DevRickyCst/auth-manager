@@ -16,7 +16,7 @@ pub struct NewRefreshToken {
 pub struct RefreshToken {
     pub id: Uuid,
     pub user_id: Uuid,
-    #[expect(dead_code, reason = "Required for Diesel Queryable deserialization")]
+    #[allow(dead_code)]
     pub token_hash: String,
     pub expires_at: DateTime<Utc>,
     #[expect(dead_code, reason = "Required for Diesel Queryable deserialization")]

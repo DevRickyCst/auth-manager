@@ -4,11 +4,11 @@ pub struct PasswordManager;
 
 impl PasswordManager {
     pub fn hash(password: &str) -> Result<String, String> {
-        hash(password, DEFAULT_COST).map_err(|e| format!("Password hashing failed: {}", e))
+        hash(password, DEFAULT_COST).map_err(|e| format!("Password hashing failed: {e}"))
     }
 
     pub fn verify(password: &str, hash: &str) -> Result<bool, String> {
-        verify(password, hash).map_err(|e| format!("Password verification failed: {}", e))
+        verify(password, hash).map_err(|e| format!("Password verification failed: {e}"))
     }
 }
 

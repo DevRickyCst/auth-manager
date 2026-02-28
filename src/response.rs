@@ -6,10 +6,10 @@ use axum::{
 };
 use serde::Serialize;
 
-/// Backend wrapper for auth-manager-api's AppResponse that adds Axum integration.
+/// Backend wrapper for auth-manager-api's `AppResponse` that adds Axum integration.
 ///
-/// This type wraps the WASM-compatible ApiResponse and provides:
-/// - Axum's IntoResponse trait implementation
+/// This type wraps the WASM-compatible `ApiResponse` and provides:
+/// - Axum's `IntoResponse` trait implementation
 /// - HTTP header support
 /// - Status code conversion
 ///
@@ -68,7 +68,10 @@ where
     }
 
     /// 202 Accepted with data
-    #[expect(dead_code, reason = "Provided for HTTP completeness; no handler uses 202 yet")]
+    #[expect(
+        dead_code,
+        reason = "Provided for HTTP completeness; no handler uses 202 yet"
+    )]
     pub fn accepted(data: T) -> Self {
         Self::new(ApiResponse::accepted(data))
     }
@@ -81,7 +84,7 @@ impl AppResponse<()> {
     }
 }
 
-/// Converts API StatusCode to Axum's StatusCode
+/// Converts API `StatusCode` to Axum's `StatusCode`
 fn convert_status(api_status: ApiStatusCode) -> StatusCode {
     match api_status {
         ApiStatusCode::Ok => StatusCode::OK,
@@ -98,7 +101,7 @@ fn convert_status(api_status: ApiStatusCode) -> StatusCode {
     }
 }
 
-/// Implements Axum's IntoResponse trait for our wrapper
+/// Implements Axum's `IntoResponse` trait for our wrapper
 impl<T> IntoResponse for AppResponse<T>
 where
     T: Serialize,

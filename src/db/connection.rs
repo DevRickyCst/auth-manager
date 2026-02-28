@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 static POOL: OnceLock<DbPool> = OnceLock::new();
 
-/// Initialize the PostgreSQL connection pool with the given database URL.
+/// Initialize the `PostgreSQL` connection pool with the given database URL.
 /// This should be called once at application startup.
 pub fn init_pool_with_url(database_url: &str) -> Result<()> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
@@ -22,7 +22,7 @@ pub fn init_pool_with_url(database_url: &str) -> Result<()> {
     Ok(())
 }
 
-/// Initialize the PostgreSQL connection pool using DATABASE_URL env var.
+/// Initialize the `PostgreSQL` connection pool using `DATABASE_URL` env var.
 /// This should be called once at application startup.
 #[allow(dead_code)]
 pub fn init_pool() -> Result<()> {
@@ -31,14 +31,14 @@ pub fn init_pool() -> Result<()> {
 }
 
 /// Get a reference to the initialized pool.
-/// Panics if the pool hasn't been initialized with init_pool().
+/// Panics if the pool hasn't been initialized with `init_pool()`.
 pub fn get_pool() -> &'static DbPool {
     POOL.get()
         .expect("DB pool not initialized. Call init_pool() first.")
 }
 
 /// Get a connection from the pool.
-/// Returns RepositoryError for use in repository layer.
+/// Returns `RepositoryError` for use in repository layer.
 pub fn get_connection() -> Result<DbConnection, RepositoryError> {
     get_pool()
         .get()

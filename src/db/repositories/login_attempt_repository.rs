@@ -8,6 +8,8 @@ pub struct LoginAttemptRepository;
 
 impl LoginAttemptRepository {
     /// Créer une tentative de login
+    // user_agent must be owned: NewLoginAttempt borrows &Option<String> from it
+    #[allow(clippy::needless_pass_by_value)]
     pub fn create(
         user_id: Option<Uuid>,
         success: bool,

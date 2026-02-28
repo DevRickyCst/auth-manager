@@ -206,7 +206,7 @@ impl AppError {
         AppError::UnauthorizedAction(msg.into())
     }
 
-    #[expect(dead_code, reason = "Planned for rate limiting feature")]
+    #[allow(dead_code)]
     pub fn too_many_attempts(msg: impl Into<String>) -> Self {
         AppError::TooManyAttempts(msg.into())
     }
@@ -220,7 +220,7 @@ impl AppError {
     }
 
     /// Retourne le code de statut HTTP
-    #[expect(dead_code, reason = "Used in unit tests")]
+    #[allow(dead_code)]
     pub fn status_code(&self) -> StatusCode {
         self.get_error_info().0
     }
@@ -234,9 +234,9 @@ impl From<crate::db::error::RepositoryError> for AppError {
         match err {
             crate::db::error::RepositoryError::NotFound(msg) => AppError::not_found(&msg),
             crate::db::error::RepositoryError::UniqueViolation(msg) => AppError::duplicate(&msg),
-            crate::db::error::RepositoryError::PoolError(msg) => AppError::database(&msg),
-            crate::db::error::RepositoryError::ForeignKeyViolation(msg) => AppError::database(&msg),
-            crate::db::error::RepositoryError::DatabaseError(msg) => AppError::database(&msg),
+            crate::db::error::RepositoryError::PoolError(msg)
+            | crate::db::error::RepositoryError::ForeignKeyViolation(msg)
+            | crate::db::error::RepositoryError::DatabaseError(msg) => AppError::database(&msg),
         }
     }
 }
@@ -270,35 +270,35 @@ impl From<&str> for AppError {
 // Depuis serde_json::Error
 impl From<serde_json::Error> for AppError {
     fn from(err: serde_json::Error) -> Self {
-        AppError::invalid_input(format!("JSON error: {}", err))
+        AppError::invalid_input(format!("JSON error: {err}"))
     }
 }
 
 // Depuis uuid::Error
 impl From<uuid::Error> for AppError {
     fn from(err: uuid::Error) -> Self {
-        AppError::invalid_input(format!("Invalid UUID: {}", err))
+        AppError::invalid_input(format!("Invalid UUID: {err}"))
     }
 }
 
 // Depuis chrono::ParseError
 impl From<chrono::ParseError> for AppError {
     fn from(err: chrono::ParseError) -> Self {
-        AppError::invalid_input(format!("Invalid date format: {}", err))
+        AppError::invalid_input(format!("Invalid date format: {err}"))
     }
 }
 
 // Depuis axum::extract::rejection::JsonRejection
 impl From<axum::extract::rejection::JsonRejection> for AppError {
     fn from(err: axum::extract::rejection::JsonRejection) -> Self {
-        AppError::invalid_input(format!("Invalid JSON: {}", err))
+        AppError::invalid_input(format!("Invalid JSON: {err}"))
     }
 }
 
 // Depuis axum::http::uri::InvalidUri
 impl From<axum::http::uri::InvalidUri> for AppError {
     fn from(err: axum::http::uri::InvalidUri) -> Self {
-        AppError::invalid_input(format!("Invalid URI: {}", err))
+        AppError::invalid_input(format!("Invalid URI: {err}"))
     }
 }
 

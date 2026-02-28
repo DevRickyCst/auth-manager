@@ -28,21 +28,18 @@ pub fn auth_routes(jwt_manager: JwtManager, auth_service: Arc<AuthService>) -> R
         .route("/logout", post(logout))
         .with_state(jwt_manager);
 
-    public
-        .merge(protected)
-        .layer(Extension(auth_service))
+    public.merge(protected).layer(Extension(auth_service))
 }
 
 /// Configure les routes utilisateur.
-/// `auth_service` est fourni en Extension; `jwt_manager` en State pour `AuthClaims`.
-pub fn user_routes(jwt_manager: JwtManager, auth_service: Arc<AuthService>) -> Router {
+/// `jwt_manager` en State pour `AuthClaims`; les handlers appellent `AuthService` directement.
+pub fn user_routes(jwt_manager: JwtManager) -> Router {
     Router::new()
         .route("/me", get(get_current_user))
         .route("/{id}", get(get_user_by_id))
         .route("/{id}", delete(delete_user))
         .route("/{id}/change-password", post(change_password))
         .with_state(jwt_manager)
-        .layer(Extension(auth_service))
 }
 
 /// Construit l'application complète
@@ -92,8 +89,8 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
 
     Router::new()
         .route("/health", get(health))
-        .nest("/auth", auth_routes(jwt_manager.clone(), auth_service.clone()))
-        .nest("/users", user_routes(jwt_manager, auth_service))
+        .nest("/auth", auth_routes(jwt_manager.clone(), auth_service))
+        .nest("/users", user_routes(jwt_manager))
         // Middleware CORS (doit être avant TraceLayer)
         .layer(cors)
         // Middleware global de tracing
@@ -135,13 +132,13 @@ mod tests {
 
     #[tokio::test]
     async fn logout_succeeds_with_valid_bearer_token() {
-        let jwt = test_jwt();
-
-        // Create a user to generate a token
         use crate::auth::password::PasswordManager;
         use crate::db::models::user::NewUser;
         use crate::db::repositories::user_repository::UserRepository;
 
+        let jwt = test_jwt();
+
+        // Create a user to generate a token
         let hash = PasswordManager::hash("OldPass123!").expect("hash");
         let new_user = NewUser {
             email: format!("logout_test_{}@example.com", uuid::Uuid::new_v4()),
@@ -156,7 +153,7 @@ mod tests {
         let req = Request::builder()
             .uri("/logout")
             .method("POST")
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 

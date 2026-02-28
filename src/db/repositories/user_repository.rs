@@ -60,7 +60,7 @@ impl UserRepository {
         Ok(())
     }
 
-    /// Mettre à jour un utilisateur (email_verified, is_active, last_login_at)
+    /// Mettre à jour un utilisateur (`email_verified`, `is_active`, `last_login_at`)
     pub fn update(id: Uuid, changes: &UpdateUser) -> Result<User, RepositoryError> {
         let mut conn = get_connection()?;
 
@@ -95,7 +95,7 @@ mod tests {
                 suffix,
                 std::time::SystemTime::now()
             ),
-            username: format!("testuser_{}", suffix),
+            username: format!("testuser_{suffix}"),
             password_hash: Some("test_hash".to_string()),
         }
     }
@@ -187,14 +187,20 @@ mod tests {
         let before = UserRepository::find_by_id(user_id)
             .expect("Query should succeed")
             .expect("User should exist");
-        assert!(before.last_login_at.is_none(), "last_login_at should be None initially");
+        assert!(
+            before.last_login_at.is_none(),
+            "last_login_at should be None initially"
+        );
 
         UserRepository::update_last_login(user_id).expect("Should update last_login");
 
         let after = UserRepository::find_by_id(user_id)
             .expect("Query should succeed")
             .expect("User should exist");
-        assert!(after.last_login_at.is_some(), "last_login_at should be set after update");
+        assert!(
+            after.last_login_at.is_some(),
+            "last_login_at should be set after update"
+        );
 
         let _ = UserRepository::delete(user_id);
     }
@@ -212,7 +218,7 @@ mod tests {
             password_hash: Some("hash".to_string()),
         };
         let user2 = NewUser {
-            email: email.clone(),
+            email,
             username: "user2".to_string(),
             password_hash: Some("hash".to_string()),
         };

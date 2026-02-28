@@ -27,12 +27,12 @@ impl AuthService {
         Self { jwt_manager }
     }
 
-    pub fn get_current_user(&self, user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
-        self.get_user_by_id(user_id)
+    pub fn get_current_user(user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
+        Self::get_user_by_id(user_id)
     }
 
     /// Déconnexion: révoque tous les refresh tokens de l'utilisateur
-    pub fn logout(&self, user_id: uuid::Uuid) -> Result<(), AppError> {
+    pub fn logout(user_id: uuid::Uuid) -> Result<(), AppError> {
         crate::db::repositories::refresh_token_repository::RefreshTokenRepository::delete_by_user(
             user_id,
         )
@@ -41,7 +41,7 @@ impl AuthService {
     }
 
     /// Récupère un utilisateur par son ID
-    pub fn get_user_by_id(&self, user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
+    pub fn get_user_by_id(user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
         UserRepository::find_by_id(user_id)
             .map_err(AppError::from)?
             .map(UserResponse::from)
@@ -49,14 +49,13 @@ impl AuthService {
     }
 
     /// Supprime un utilisateur
-    pub fn delete_user(&self, user_id: uuid::Uuid) -> Result<(), AppError> {
+    pub fn delete_user(user_id: uuid::Uuid) -> Result<(), AppError> {
         UserRepository::delete(user_id)?;
         Ok(())
     }
 
     /// Change le mot de passe de l'utilisateur
     pub fn change_password(
-        &self,
         user_id: uuid::Uuid,
         old_password: &str,
         new_password: &str,
@@ -125,14 +124,14 @@ impl AuthService {
 
         // Crée l'utilisateur
         UserRepository::create(&new_user)
-            .map(|user| user.into())
+            .map(std::convert::Into::into)
             .map_err(AppError::from)
     }
 
     /// Connexion d'un utilisateur
     pub fn login(
         &self,
-        login_request: LoginRequest,
+        login_request: &LoginRequest,
         user_agent: Option<String>,
     ) -> Result<(LoginResponse, String), AppError> {
         // Valide l'email
@@ -156,8 +155,7 @@ impl AuthService {
                 .unwrap_or(0);
         if failed_count >= MAX_FAILED_ATTEMPTS {
             return Err(AppError::TooManyAttempts(format!(
-                "Account temporarily locked after {} failed attempts. Try again in {} minutes.",
-                MAX_FAILED_ATTEMPTS, LOCKOUT_WINDOW_MINUTES
+                "Account temporarily locked after {MAX_FAILED_ATTEMPTS} failed attempts. Try again in {LOCKOUT_WINDOW_MINUTES} minutes."
             )));
         }
 
@@ -212,7 +210,7 @@ impl AuthService {
     /// Rafraîchit les tokens
     pub fn refresh_token(
         &self,
-        refresh_token_request: RefreshTokenRequest,
+        refresh_token_request: &RefreshTokenRequest,
     ) -> Result<(RefreshTokenResponse, String), AppError> {
         if refresh_token_request.refresh_token.is_empty() {
             return Err(AppError::InvalidRefreshToken);
@@ -236,7 +234,9 @@ impl AuthService {
 
         // Supprime l'ancien refresh token
         RefreshTokenRepository::delete(old_token.id)
-            .inspect_err(|e| tracing::error!("Failed to delete old refresh token {}: {e}", old_token.id))
+            .inspect_err(|e| {
+                tracing::error!("Failed to delete old refresh token {}: {e}", old_token.id);
+            })
             .ok();
 
         // Crée un nouveau refresh token
@@ -269,9 +269,9 @@ impl AuthService {
 
     fn is_strong_password(password: &str) -> bool {
         password.len() >= 8
-            && password.chars().any(|c| c.is_uppercase())
-            && password.chars().any(|c| c.is_lowercase())
-            && password.chars().any(|c| c.is_numeric())
+            && password.chars().any(char::is_uppercase)
+            && password.chars().any(char::is_lowercase)
+            && password.chars().any(char::is_numeric)
     }
 }
 
@@ -288,8 +288,8 @@ mod tests {
 
         let unique = uuid::Uuid::new_v4();
         RegisterRequest {
-            email: format!("test+{}@example.com", unique),
-            username: format!("testuser_{}", unique),
+            email: format!("test+{unique}@example.com"),
+            username: format!("testuser_{unique}"),
             password: "TestPassword123!".to_string(),
         }
     }
@@ -363,7 +363,7 @@ mod tests {
         };
 
         let (login_response, _refresh_hash) = auth_service
-            .login(login_request, None)
+            .login(&login_request, None)
             .expect("Login should succeed");
 
         assert_eq!(login_response.user.email, email);
@@ -385,7 +385,7 @@ mod tests {
             password: "WrongPassword123!".to_string(),
         };
 
-        let result = auth_service.login(login_request, None);
+        let result = auth_service.login(&login_request, None);
         assert!(result.is_err());
 
         let _ = UserRepository::delete(user.id);
@@ -402,7 +402,7 @@ mod tests {
             password: "TestPassword123!".to_string(),
         };
 
-        let result = auth_service.login(login_request, None);
+        let result = auth_service.login(&login_request, None);
         assert!(result.is_err());
     }
 
@@ -419,9 +419,7 @@ mod tests {
         let user = UserRepository::create(&new_user).expect("create user");
 
         // Change password via service
-        let jwt_manager = crate::auth::jwt::JwtManager::new("svc_secret", 1);
-        let svc = AuthService::new(jwt_manager);
-        let result = svc.change_password(user.id, "OldPass123!", "NewPass456!");
+        let result = AuthService::change_password(user.id, "OldPass123!", "NewPass456!");
         assert!(result.is_ok(), "Change password should succeed");
 
         // Verify new password
@@ -446,9 +444,7 @@ mod tests {
         };
         let user = UserRepository::create(&new_user).expect("create user");
 
-        let jwt_manager = crate::auth::jwt::JwtManager::new("svc_secret", 1);
-        let svc = AuthService::new(jwt_manager);
-        let result = svc.change_password(user.id, "WrongOld!", "NewPass456!");
+        let result = AuthService::change_password(user.id, "WrongOld!", "NewPass456!");
         assert!(result.is_err(), "Should fail with invalid old password");
 
         let _ = UserRepository::delete(user.id);

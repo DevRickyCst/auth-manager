@@ -17,7 +17,7 @@ impl Environment {
 
         // Méthode 2: Vérifier la variable APP_ENV
         match env::var("APP_ENV").as_deref() {
-            Ok("production") | Ok("prod") => Self::Production,
+            Ok("production" | "prod") => Self::Production,
             _ => Self::Development,
         }
     }
@@ -44,7 +44,10 @@ pub struct Config {
     pub database_url: String,
     pub jwt_secret: String,
     pub jwt_expiration_hours: i64,
-    #[expect(dead_code, reason = "CORS origin is consumed at startup in app.rs; field retained for completeness")]
+    #[expect(
+        dead_code,
+        reason = "CORS origin is consumed at startup in app.rs; field retained for completeness"
+    )]
     pub frontend_url: String,
     pub server_host: String,
     pub server_port: u16,
@@ -62,7 +65,7 @@ impl Config {
         );
 
         // Charger le fichier .env approprié
-        Self::load_env_file(&environment)?;
+        Self::load_env_file(&environment);
 
         // Récupérer les variables avec fallbacks intelligents
         let database_url = Self::get_database_url(&environment)?;
@@ -95,11 +98,11 @@ impl Config {
     }
 
     /// Charge le bon fichier .env selon l'environnement
-    fn load_env_file(environment: &Environment) -> Result<()> {
+    fn load_env_file(environment: &Environment) {
         // En production (Lambda), les variables sont déjà injectées
         if environment.is_production() {
             tracing::info!("📦 Production mode: using injected environment variables");
-            return Ok(());
+            return;
         }
 
         // En développement, charger .env
@@ -116,11 +119,9 @@ impl Config {
                 tracing::warn!("   .env file not found, using environment variables");
             }
         }
-
-        Ok(())
     }
 
-    /// Récupère DATABASE_URL avec logique intelligente
+    /// Récupère `DATABASE_URL` avec logique intelligente
     fn get_database_url(environment: &Environment) -> Result<String> {
         // Essayer DATABASE_URL directement (fonctionne dans tous les cas)
         if let Ok(url) = env::var("DATABASE_URL") {
@@ -143,12 +144,11 @@ impl Config {
         let database = env::var("POSTGRES_DB").unwrap_or_else(|_| "auth_db".to_string());
 
         Ok(format!(
-            "postgres://{}:{}@{}:{}/{}",
-            user, password, host, port, database
+            "postgres://{user}:{password}@{host}:{port}/{database}"
         ))
     }
 
-    /// Récupère JWT_SECRET avec validation
+    /// Récupère `JWT_SECRET` avec validation
     fn get_jwt_secret(environment: &Environment) -> Result<String> {
         let secret = match env::var("JWT_SECRET") {
             Ok(s) => s,
@@ -173,7 +173,7 @@ impl Config {
         Ok(secret)
     }
 
-    /// Récupère FRONTEND_URL avec fallback
+    /// Récupère `FRONTEND_URL` avec fallback
     fn get_frontend_url(environment: &Environment) -> String {
         env::var("FRONTEND_URL").unwrap_or_else(|_| {
             if environment.is_production() {
@@ -191,7 +191,7 @@ impl Config {
         {
             let scheme = &url[..scheme_end + 3];
             let after_at = &url[at_pos..];
-            return format!("{}***:***{}", scheme, after_at);
+            return format!("{scheme}***:***{after_at}");
         }
         url.to_string()
     }
@@ -202,7 +202,10 @@ impl Config {
     }
 
     /// Retourne true si on est en mode développement
-    #[expect(dead_code, reason = "Available for conditional behavior in request handlers")]
+    #[expect(
+        dead_code,
+        reason = "Available for conditional behavior in request handlers"
+    )]
     pub fn is_development(&self) -> bool {
         self.environment.is_development()
     }

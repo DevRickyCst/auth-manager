@@ -40,15 +40,14 @@ async fn main() -> Result<(), lambda_http::Error> {
 
     // Initialize database connection pool
     tracing::info!("🔌 Initializing database connection pool...");
-    db::connection::init_pool_with_url(&config.database_url)
-        .inspect_err(|e| {
-            tracing::error!("❌ Failed to initialize database connection pool: {:#}", e);
-            tracing::error!("   This is usually caused by:");
-            tracing::error!("   1. DATABASE_URL is incorrect");
-            tracing::error!("   2. Database is not accessible from Lambda");
-            tracing::error!("   3. Credentials are invalid");
-            tracing::error!("   4. SSL/TLS issues");
-        })?;
+    db::connection::init_pool_with_url(&config.database_url).inspect_err(|e| {
+        tracing::error!("❌ Failed to initialize database connection pool: {:#}", e);
+        tracing::error!("   This is usually caused by:");
+        tracing::error!("   1. DATABASE_URL is incorrect");
+        tracing::error!("   2. Database is not accessible from Lambda");
+        tracing::error!("   3. Credentials are invalid");
+        tracing::error!("   4. SSL/TLS issues");
+    })?;
     tracing::info!("✅ Database connection pool initialized");
 
     // Create JWT manager

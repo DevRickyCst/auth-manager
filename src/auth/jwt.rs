@@ -53,8 +53,7 @@ impl JwtManager {
             iat: now.timestamp(),
         };
 
-        encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(JwtError::GenerationFailed)
+        encode(&Header::default(), &claims, &self.encoding_key).map_err(JwtError::GenerationFailed)
     }
 
     pub fn verify_token(&self, token: &str) -> Result<Claims, JwtError> {
@@ -95,7 +94,10 @@ mod tests {
             .expect("Token generation should succeed");
 
         assert!(!token.is_empty(), "Token should not be empty");
-        assert!(token.contains('.'), "JWT should have dots (header.payload.signature)");
+        assert!(
+            token.contains('.'),
+            "JWT should have dots (header.payload.signature)"
+        );
     }
 
     #[test]
@@ -106,10 +108,15 @@ mod tests {
             .generate_token(user_id, 1)
             .expect("Failed to generate token");
 
-        let claims = jwt.verify_token(&token).expect("Token verification should succeed");
+        let claims = jwt
+            .verify_token(&token)
+            .expect("Token verification should succeed");
 
         assert_eq!(claims.sub, user_id, "User ID should match");
-        assert!(claims.exp > claims.iat, "Expiry should be after issued time");
+        assert!(
+            claims.exp > claims.iat,
+            "Expiry should be after issued time"
+        );
     }
 
     #[test]
@@ -118,6 +125,9 @@ mod tests {
 
         let result = jwt.verify_token("invalid.token.here");
 
-        assert!(matches!(result.unwrap_err(), JwtError::VerificationFailed(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            JwtError::VerificationFailed(_)
+        ));
     }
 }

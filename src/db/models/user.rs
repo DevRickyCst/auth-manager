@@ -45,5 +45,6 @@ impl From<User> for UserResponse {
 pub struct UpdateUser {
     pub email_verified: Option<bool>,
     pub is_active: Option<bool>,
+    #[allow(clippy::option_option)]
     pub last_login_at: Option<Option<DateTime<Utc>>>,
 }
