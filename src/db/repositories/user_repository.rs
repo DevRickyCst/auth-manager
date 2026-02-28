@@ -8,12 +8,13 @@ use uuid::Uuid;
 pub struct UserRepository;
 
 impl UserRepository {
+    /// Finds a user by email address. Returns `None` if no match.
     pub fn find_by_email(email: &str) -> Result<Option<User>, RepositoryError> {
         let mut conn = get_connection()?;
 
         users::table
             .filter(users::email.eq(email))
-            .first::<User>(&mut *conn)
+            .first::<User>(&mut conn)
             .optional()
             .map_err(Into::into)
     }
@@ -49,7 +50,7 @@ impl UserRepository {
         Ok(())
     }
 
-    // Mettre à jour le mot de passe
+    /// Replaces the stored password hash for the given user.
     pub fn update_password(id: Uuid, new_password_hash: &str) -> Result<(), RepositoryError> {
         let mut conn = get_connection()?;
 

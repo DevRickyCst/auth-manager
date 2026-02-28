@@ -26,6 +26,7 @@ pub struct JwtManager {
 }
 
 impl JwtManager {
+    /// Creates a new `JwtManager` with the given HMAC secret and token lifetime.
     pub fn new(secret: &str, expiration_hours: i64) -> Self {
         Self {
             encoding_key: EncodingKey::from_secret(secret.as_ref()),
@@ -34,15 +35,25 @@ impl JwtManager {
         }
     }
 
-    /// Génère un access token avec la durée configurée
+    /// Generates an access token using the configured expiration duration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JwtError::GenerationFailed`] if token encoding fails.
     pub fn generate_access_token(&self, user_id: Uuid) -> Result<String, JwtError> {
         self.generate_token(user_id, self.expiration_hours)
     }
 
+    /// Returns the configured token lifetime in hours.
     pub fn expiration_hours(&self) -> i64 {
         self.expiration_hours
     }
 
+    /// Generates a signed JWT for `user_id` with a custom expiration in hours.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JwtError::GenerationFailed`] if token encoding fails.
     pub fn generate_token(&self, user_id: Uuid, expires_in_hours: i64) -> Result<String, JwtError> {
         let now = Utc::now();
         let exp = (now + Duration::hours(expires_in_hours)).timestamp();
@@ -56,6 +67,11 @@ impl JwtManager {
         encode(&Header::default(), &claims, &self.encoding_key).map_err(JwtError::GenerationFailed)
     }
 
+    /// Verifies a JWT signature and returns the decoded claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JwtError::VerificationFailed`] if the token is invalid, expired, or tampered with.
     pub fn verify_token(&self, token: &str) -> Result<Claims, JwtError> {
         decode(token, &self.decoding_key, &Validation::default())
             .map(|data| data.claims)

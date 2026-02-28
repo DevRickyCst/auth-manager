@@ -37,7 +37,7 @@ pub async fn login(
     let user_agent = headers
         .get("user-agent")
         .and_then(|h| h.to_str().ok())
-        .map(std::string::ToString::to_string);
+        .map(str::to_owned);
 
     let (response, refresh_hash) = auth_service.login(&payload, user_agent)?;
 

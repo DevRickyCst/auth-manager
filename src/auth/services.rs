@@ -42,10 +42,7 @@ impl AuthService {
     ///
     /// Returns a database error if token deletion fails.
     pub fn logout(user_id: uuid::Uuid) -> Result<(), AppError> {
-        crate::db::repositories::refresh_token_repository::RefreshTokenRepository::delete_by_user(
-            user_id,
-        )
-        .map_err(AppError::from)?;
+        RefreshTokenRepository::delete_by_user(user_id).map_err(AppError::from)?;
         Ok(())
     }
 
