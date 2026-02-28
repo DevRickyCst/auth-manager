@@ -31,7 +31,10 @@ pub fn init_pool() -> Result<()> {
 }
 
 /// Get a reference to the initialized pool.
-/// Panics if the pool hasn't been initialized with `init_pool()`.
+///
+/// # Panics
+///
+/// Panics if [`init_pool_with_url`] hasn't been called before this function.
 pub fn get_pool() -> &'static DbPool {
     POOL.get()
         .expect("DB pool not initialized. Call init_pool() first.")
