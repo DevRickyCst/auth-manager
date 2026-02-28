@@ -7,7 +7,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum AppError {
     // === Erreurs Repository ===
     #[error("Not found: {0}")]
@@ -253,20 +253,6 @@ impl From<crate::auth::jwt::JwtError> for AppError {
             }
             crate::auth::jwt::JwtError::VerificationFailed(_) => AppError::InvalidRefreshToken,
         }
-    }
-}
-
-// Depuis String (erreurs externes)
-impl From<String> for AppError {
-    fn from(err: String) -> Self {
-        AppError::internal(err)
-    }
-}
-
-// Depuis &str
-impl From<&str> for AppError {
-    fn from(err: &str) -> Self {
-        AppError::internal(err.to_string())
     }
 }
 

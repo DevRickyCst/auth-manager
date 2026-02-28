@@ -25,28 +25,39 @@ mod tests {
     use super::PasswordManager;
 
     #[test]
-    fn hash_and_verify_succeeds_with_correct_password() {
+    fn verify_returns_true_when_password_matches() {
         let password = "secure_password_@123P";
         let hashed = PasswordManager::hash(password).expect("Hashing failed");
 
         assert!(PasswordManager::verify(password, &hashed).expect("Verification failed"));
+    }
+
+    #[test]
+    fn verify_returns_false_when_password_does_not_match() {
+        let password = "secure_password_@123P";
+        let hashed = PasswordManager::hash(password).expect("Hashing failed");
+
         assert!(
             !PasswordManager::verify("wrong_password_@123", &hashed).expect("Verification failed")
         );
     }
 
     #[test]
-    fn hash_produces_unique_hashes_for_same_password() {
+    fn hashes_differ_for_different_passwords() {
+        let hash1 = PasswordManager::hash("user1_password").unwrap();
+        let hash2 = PasswordManager::hash("user2_password").unwrap();
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn cross_verify_rejects_mismatched_password_and_hash() {
         let password1 = "user1_password";
         let password2 = "user2_password";
 
         let hash1 = PasswordManager::hash(password1).unwrap();
         let hash2 = PasswordManager::hash(password2).unwrap();
 
-        // Les hashes doivent être différents
-        assert_ne!(hash1, hash2);
-
-        // Vérification croisée ne doit pas fonctionner
         assert!(!PasswordManager::verify(password1, &hash2).unwrap());
         assert!(!PasswordManager::verify(password2, &hash1).unwrap());
     }

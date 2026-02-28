@@ -1,19 +1,21 @@
 // src/handlers/auth.rs
 
-use crate::auth::extractors::AuthClaims;
-use crate::auth::services::AuthService;
-use crate::error::AppError;
-use crate::response::AppResponse;
+use std::sync::Arc;
+
 use auth_manager_api::{
     LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
     UserResponse,
 };
-use axum::extract::Extension;
 use axum::{
     Json,
+    extract::Extension,
     http::{HeaderMap, HeaderValue},
 };
-use std::sync::Arc;
+
+use crate::auth::extractors::AuthClaims;
+use crate::auth::services::AuthService;
+use crate::error::AppError;
+use crate::response::AppResponse;
 
 /// POST /auth/register
 /// Inscription d'un nouvel utilisateur

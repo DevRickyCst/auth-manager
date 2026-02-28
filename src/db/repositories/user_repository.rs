@@ -100,167 +100,158 @@ mod tests {
         }
     }
 
-    // ============================================
-    // Test 1: Créer un utilisateur
-    // ============================================
-    #[test]
-    fn create_user_succeeds_with_valid_data() {
-        let new_user = create_test_user("create");
+    mod create {
+        use super::*;
 
-        let created_user = UserRepository::create(&new_user).expect("Should create user");
+        #[test]
+        fn create_user_succeeds_with_valid_data() {
+            let new_user = create_test_user("create");
 
-        assert_eq!(created_user.email, new_user.email);
-        assert_eq!(created_user.username, new_user.username);
+            let created_user = UserRepository::create(&new_user).expect("Should create user");
 
-        let _ = UserRepository::delete(created_user.id);
+            assert_eq!(created_user.email, new_user.email);
+            assert_eq!(created_user.username, new_user.username);
+
+            let _ = UserRepository::delete(created_user.id);
+        }
+
+        #[test]
+        fn create_fails_when_email_already_exists() {
+            init_test_pool();
+            let email = format!("duplicate_{}@example.com", Uuid::new_v4());
+            let user1 = NewUser {
+                email: email.clone(),
+                username: "user1".to_string(),
+                password_hash: Some("hash".to_string()),
+            };
+            let user2 = NewUser {
+                email,
+                username: "user2".to_string(),
+                password_hash: Some("hash".to_string()),
+            };
+
+            let created1 = UserRepository::create(&user1).expect("Failed to create first user");
+
+            let result = UserRepository::create(&user2);
+
+            assert!(
+                result.is_err(),
+                "Should fail due to unique constraint on email"
+            );
+
+            let _ = UserRepository::delete(created1.id);
+        }
     }
 
-    // ============================================
-    // Test 2: Trouver par email
-    // ============================================
-    #[test]
-    fn find_by_email_returns_user_when_exists() {
-        let new_user = create_test_user("find_email");
-        let created = UserRepository::create(&new_user).expect("Failed to create user");
+    mod find_by_email {
+        use super::*;
 
-        let found = UserRepository::find_by_email(&new_user.email)
-            .expect("Query should succeed")
-            .expect("User should exist");
+        #[test]
+        fn find_by_email_returns_user_when_exists() {
+            let new_user = create_test_user("find_email");
+            let created = UserRepository::create(&new_user).expect("Failed to create user");
 
-        assert_eq!(found.id, created.id);
+            let found = UserRepository::find_by_email(&new_user.email)
+                .expect("Query should succeed")
+                .expect("User should exist");
 
-        let _ = UserRepository::delete(created.id);
+            assert_eq!(found.id, created.id);
+
+            let _ = UserRepository::delete(created.id);
+        }
+
+        #[test]
+        fn find_by_email_returns_none_when_not_found() {
+            init_test_pool();
+
+            let found = UserRepository::find_by_email("nonexistent_email_12345@example.com")
+                .expect("Query should succeed even if user not found");
+
+            assert!(found.is_none(), "User should not exist");
+        }
     }
 
-    // ============================================
-    // Test 3: Email non existant
-    // ============================================
-    #[test]
-    fn find_by_email_returns_none_when_not_found() {
-        init_test_pool();
+    mod find_by_id {
+        use super::*;
 
-        let found = UserRepository::find_by_email("nonexistent_email_12345@example.com")
-            .expect("Query should succeed even if user not found");
+        #[test]
+        fn find_by_id_returns_user_when_exists() {
+            let new_user = create_test_user("find_id");
+            let created = UserRepository::create(&new_user).expect("Failed to create user");
 
-        assert!(found.is_none(), "User should not exist");
+            let found = UserRepository::find_by_id(created.id)
+                .expect("Query should succeed")
+                .expect("User should exist");
+
+            assert_eq!(found.id, created.id);
+
+            let _ = UserRepository::delete(created.id);
+        }
+
+        #[test]
+        fn find_by_id_returns_none_when_not_found() {
+            init_test_pool();
+
+            let found = UserRepository::find_by_id(Uuid::new_v4())
+                .expect("Query should succeed even if user not found");
+
+            assert!(found.is_none(), "User should not exist");
+        }
     }
 
-    // ============================================
-    // Test 4: Trouver par ID
-    // ============================================
-    #[test]
-    fn find_by_id_returns_user_when_exists() {
-        let new_user = create_test_user("find_id");
-        let created = UserRepository::create(&new_user).expect("Failed to create user");
+    mod update {
+        use super::*;
 
-        let found = UserRepository::find_by_id(created.id)
-            .expect("Query should succeed")
-            .expect("User should exist");
+        #[test]
+        fn update_last_login_sets_timestamp_in_db() {
+            let new_user = create_test_user("login");
+            let created = UserRepository::create(&new_user).expect("Failed to create user");
+            let user_id = created.id;
 
-        assert_eq!(found.id, created.id);
+            let before = UserRepository::find_by_id(user_id)
+                .expect("Query should succeed")
+                .expect("User should exist");
+            assert!(
+                before.last_login_at.is_none(),
+                "last_login_at should be None initially"
+            );
 
-        let _ = UserRepository::delete(created.id);
-    }
+            UserRepository::update_last_login(user_id).expect("Should update last_login");
 
-    // ============================================
-    // Test 5: ID non existant
-    // ============================================
-    #[test]
-    fn find_by_id_returns_none_when_not_found() {
-        init_test_pool();
+            let after = UserRepository::find_by_id(user_id)
+                .expect("Query should succeed")
+                .expect("User should exist");
+            assert!(
+                after.last_login_at.is_some(),
+                "last_login_at should be set after update"
+            );
 
-        let found = UserRepository::find_by_id(Uuid::new_v4())
-            .expect("Query should succeed even if user not found");
+            let _ = UserRepository::delete(user_id);
+        }
 
-        assert!(found.is_none(), "User should not exist");
-    }
+        #[test]
+        fn update_password_stores_new_hash_in_db() {
+            init_test_pool();
+            let new_user = NewUser {
+                email: format!("update_pw_{}@example.com", Uuid::new_v4()),
+                username: "update_pw_user".to_string(),
+                password_hash: Some(PasswordManager::hash("OldPass123!").expect("hash")),
+            };
 
-    // ============================================
-    // Test 6: Update last login
-    // ============================================
-    #[test]
-    fn update_last_login_succeeds() {
-        let new_user = create_test_user("login");
-        let created = UserRepository::create(&new_user).expect("Failed to create user");
-        let user_id = created.id;
+            let created = UserRepository::create(&new_user).expect("Failed to create user");
+            let user_id = created.id;
 
-        let before = UserRepository::find_by_id(user_id)
-            .expect("Query should succeed")
-            .expect("User should exist");
-        assert!(
-            before.last_login_at.is_none(),
-            "last_login_at should be None initially"
-        );
+            let new_hash = PasswordManager::hash("NewPass456!").expect("hash");
+            UserRepository::update_password(user_id, &new_hash).expect("Should update password");
 
-        UserRepository::update_last_login(user_id).expect("Should update last_login");
+            let updated = UserRepository::find_by_id(user_id)
+                .expect("Should find user")
+                .expect("User should exist");
+            let hash = updated.password_hash.as_ref().expect("hash present");
+            let ok = PasswordManager::verify("NewPass456!", hash).expect("verify");
+            assert!(ok, "New password should verify");
 
-        let after = UserRepository::find_by_id(user_id)
-            .expect("Query should succeed")
-            .expect("User should exist");
-        assert!(
-            after.last_login_at.is_some(),
-            "last_login_at should be set after update"
-        );
-
-        let _ = UserRepository::delete(user_id);
-    }
-
-    // ============================================
-    // Test 7: Duplicate email
-    // ============================================
-    #[test]
-    fn create_fails_when_email_already_exists() {
-        init_test_pool();
-        let email = format!("duplicate_{}@example.com", Uuid::new_v4());
-        let user1 = NewUser {
-            email: email.clone(),
-            username: "user1".to_string(),
-            password_hash: Some("hash".to_string()),
-        };
-        let user2 = NewUser {
-            email,
-            username: "user2".to_string(),
-            password_hash: Some("hash".to_string()),
-        };
-
-        let created1 = UserRepository::create(&user1).expect("Failed to create first user");
-
-        let result = UserRepository::create(&user2);
-
-        assert!(
-            result.is_err(),
-            "Should fail due to unique constraint on email"
-        );
-
-        // Cleanup
-        let _ = UserRepository::delete(created1.id);
-    }
-
-    // ============================================
-    // Test 8: Update password
-    // ============================================
-    #[test]
-    fn update_password_succeeds() {
-        init_test_pool();
-        let new_user = NewUser {
-            email: format!("update_pw_{}@example.com", Uuid::new_v4()),
-            username: "update_pw_user".to_string(),
-            password_hash: Some(PasswordManager::hash("OldPass123!").expect("hash")),
-        };
-
-        let created = UserRepository::create(&new_user).expect("Failed to create user");
-        let user_id = created.id;
-
-        let new_hash = PasswordManager::hash("NewPass456!").expect("hash");
-        UserRepository::update_password(user_id, &new_hash).expect("Should update password");
-
-        let updated = UserRepository::find_by_id(user_id)
-            .expect("Should find user")
-            .expect("User should exist");
-        let hash = updated.password_hash.as_ref().expect("hash present");
-        let ok = PasswordManager::verify("NewPass456!", hash).expect("verify");
-        assert!(ok, "New password should verify");
-
-        let _ = UserRepository::delete(user_id);
+            let _ = UserRepository::delete(user_id);
+        }
     }
 }

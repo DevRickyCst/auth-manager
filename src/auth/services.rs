@@ -27,11 +27,20 @@ impl AuthService {
         Self { jwt_manager }
     }
 
+    /// Returns the current authenticated user's profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError::NotFound`] if the user no longer exists, or a database error.
     pub fn get_current_user(user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
         Self::get_user_by_id(user_id)
     }
 
-    /// Déconnexion: révoque tous les refresh tokens de l'utilisateur
+    /// Revokes all refresh tokens for the given user (logout).
+    ///
+    /// # Errors
+    ///
+    /// Returns a database error if token deletion fails.
     pub fn logout(user_id: uuid::Uuid) -> Result<(), AppError> {
         crate::db::repositories::refresh_token_repository::RefreshTokenRepository::delete_by_user(
             user_id,
@@ -40,7 +49,11 @@ impl AuthService {
         Ok(())
     }
 
-    /// Récupère un utilisateur par son ID
+    /// Fetches a user by their ID and maps to a public response DTO.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError::NotFound`] if no user with that ID exists, or a database error.
     pub fn get_user_by_id(user_id: uuid::Uuid) -> Result<UserResponse, AppError> {
         UserRepository::find_by_id(user_id)
             .map_err(AppError::from)?
@@ -48,19 +61,29 @@ impl AuthService {
             .ok_or_else(|| AppError::not_found("User not found"))
     }
 
-    /// Supprime un utilisateur
+    /// Permanently deletes a user account.
+    ///
+    /// # Errors
+    ///
+    /// Returns a database error if deletion fails.
     pub fn delete_user(user_id: uuid::Uuid) -> Result<(), AppError> {
         UserRepository::delete(user_id)?;
         Ok(())
     }
 
-    /// Change le mot de passe de l'utilisateur
+    /// Changes the user's password after verifying the current one.
+    ///
+    /// # Errors
+    ///
+    /// - [`AppError::WeakPassword`] if `new_password` does not meet strength requirements.
+    /// - [`AppError::NotFound`] if the user does not exist.
+    /// - [`AppError::InvalidPassword`] if `old_password` does not match the stored hash.
+    /// - [`AppError::DatabaseError`] on persistence failures.
     pub fn change_password(
         user_id: uuid::Uuid,
         old_password: &str,
         new_password: &str,
     ) -> Result<(), AppError> {
-        // Vérifie que le nouveau password est fort
         if !Self::is_strong_password(new_password) {
             return Err(AppError::WeakPassword(
                 "Password must be at least 8 characters with uppercase, lowercase and numbers"
@@ -68,7 +91,6 @@ impl AuthService {
             ));
         }
 
-        // Récupère l'utilisateur
         let user = UserRepository::find_by_id(user_id)?;
         let user = user.ok_or_else(|| AppError::not_found("User not found"))?;
 
@@ -76,29 +98,33 @@ impl AuthService {
             .password_hash
             .as_ref()
             .ok_or_else(|| AppError::database("Password not set for user"))?;
-        // Vérifie le ancien password
+
         if !super::password::PasswordManager::verify(old_password, password_hash)
             .map_err(AppError::from)?
         {
             return Err(AppError::InvalidPassword);
         }
 
-        // Hash le nouveau password
         let new_password_hash =
             super::password::PasswordManager::hash(new_password).map_err(AppError::from)?;
 
-        // Met à jour le password
         UserRepository::update_password(user_id, &new_password_hash)?;
         Ok(())
     }
-    /// Inscription d'un nouvel utilisateur
+
+    /// Registers a new user account.
+    ///
+    /// # Errors
+    ///
+    /// - [`AppError::InvalidEmail`] if the email format is invalid.
+    /// - [`AppError::WeakPassword`] if the password does not meet strength requirements.
+    /// - [`AppError::UserAlreadyExists`] if the email is already registered.
+    /// - [`AppError::DatabaseError`] on persistence failures.
     pub fn register(register_request: RegisterRequest) -> Result<UserResponse, AppError> {
-        // Validation email
         if !Self::is_valid_email(&register_request.email) {
             return Err(AppError::InvalidEmail);
         }
 
-        // Validation password
         if !Self::is_strong_password(&register_request.password) {
             return Err(AppError::WeakPassword(
                 "Password must be at least 8 characters with uppercase, lowercase and numbers"
@@ -106,13 +132,11 @@ impl AuthService {
             ));
         }
 
-        // Vérifier que l'email n'existe pas
         let user = UserRepository::find_by_email(&register_request.email)?;
         if user.is_some() {
             return Err(AppError::UserAlreadyExists);
         }
 
-        // Hash le password
         let password_hash = super::password::PasswordManager::hash(&register_request.password)
             .map_err(AppError::from)?;
 
@@ -122,44 +146,51 @@ impl AuthService {
             password_hash: Some(password_hash),
         };
 
-        // Crée l'utilisateur
         UserRepository::create(&new_user)
             .map(std::convert::Into::into)
             .map_err(AppError::from)
     }
 
-    /// Connexion d'un utilisateur
+    /// Authenticates a user and returns an access token + refresh token hash.
+    ///
+    /// The second element of the returned tuple is the **bcrypt hash** of the refresh token,
+    /// intended to be stored in an `HttpOnly` cookie — never returned in the response body.
+    ///
+    /// # Errors
+    ///
+    /// - [`AppError::InvalidEmail`] if the email format is invalid.
+    /// - [`AppError::NotFound`] if no user with that email exists.
+    /// - [`AppError::TooManyAttempts`] if the account is temporarily locked.
+    /// - [`AppError::InvalidPassword`] if the password does not match.
+    /// - [`AppError::DatabaseError`] on persistence failures.
     pub fn login(
         &self,
         login_request: &LoginRequest,
         user_agent: Option<String>,
     ) -> Result<(LoginResponse, String), AppError> {
-        // Valide l'email
         if !Self::is_valid_email(&login_request.email) {
             return Err(AppError::InvalidEmail);
         }
 
-        // Recherche l'utilisateur
         let user = match UserRepository::find_by_email(&login_request.email) {
             Ok(Some(u)) => u,
             Ok(None) => {
-                let _ = LoginAttemptRepository::create(None, false, user_agent);
+                let _ = LoginAttemptRepository::create(None, false, user_agent)
+                    .inspect_err(|e| tracing::warn!("Failed to log login attempt: {e}"));
                 return Err(AppError::not_found("User"));
             }
             Err(e) => return Err(AppError::from(e)),
         };
 
-        // Brute-force protection: vérifie le nombre de tentatives récentes
         let failed_count =
             LoginAttemptRepository::count_failed_attempts(user.id, LOCKOUT_WINDOW_MINUTES)
-                .unwrap_or(0);
+                .map_err(AppError::from)?;
         if failed_count >= MAX_FAILED_ATTEMPTS {
             return Err(AppError::TooManyAttempts(format!(
                 "Account temporarily locked after {MAX_FAILED_ATTEMPTS} failed attempts. Try again in {LOCKOUT_WINDOW_MINUTES} minutes."
             )));
         }
 
-        // Vérifie le password
         let password_hash = user
             .password_hash
             .as_ref()
@@ -168,11 +199,11 @@ impl AuthService {
         if !super::password::PasswordManager::verify(&login_request.password, password_hash)
             .map_err(AppError::from)?
         {
-            let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent);
+            let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent)
+                .inspect_err(|e| tracing::warn!("Failed to log failed login attempt: {e}"));
             return Err(AppError::InvalidPassword);
         }
 
-        // Génère les tokens
         let access_token = self
             .jwt_manager
             .generate_access_token(user.id)
@@ -188,14 +219,11 @@ impl AuthService {
             expires_at: Utc::now() + chrono::Duration::days(7),
         };
 
-        // Enregistre le refresh token
         let _created = RefreshTokenRepository::create(&new_refresh_token)?;
-
-        // Met à jour le last_login
         UserRepository::update_last_login(user.id)?;
 
-        // Enregistre la tentative réussie
-        let _ = LoginAttemptRepository::create(Some(user.id), true, user_agent);
+        let _ = LoginAttemptRepository::create(Some(user.id), true, user_agent)
+            .inspect_err(|e| tracing::warn!("Failed to log successful login attempt: {e}"));
 
         let resp = LoginResponse {
             access_token,
@@ -207,7 +235,16 @@ impl AuthService {
         Ok((resp, refresh_token_hash))
     }
 
-    /// Rafraîchit les tokens
+    /// Rotates a refresh token: invalidates the old one and issues a new pair.
+    ///
+    /// The second element of the returned tuple is the **bcrypt hash** of the new refresh token,
+    /// intended to be stored in an `HttpOnly` cookie.
+    ///
+    /// # Errors
+    ///
+    /// - [`AppError::InvalidRefreshToken`] if the token is empty or not found in the database.
+    /// - [`AppError::RefreshTokenExpired`] if the token has passed its expiry date.
+    /// - [`AppError::DatabaseError`] on persistence failures.
     pub fn refresh_token(
         &self,
         refresh_token_request: &RefreshTokenRequest,
@@ -216,30 +253,25 @@ impl AuthService {
             return Err(AppError::InvalidRefreshToken);
         }
 
-        // Recherche le refresh token
         let old_token = RefreshTokenRepository::find_by_hash(&refresh_token_request.refresh_token)
             .map_err(AppError::from)?
             .ok_or(AppError::InvalidRefreshToken)?;
 
-        // Vérifie qu'il n'a pas expiré
         if old_token.expires_at < Utc::now() {
             return Err(AppError::RefreshTokenExpired);
         }
 
-        // Génère un nouveau access token
         let access_token = self
             .jwt_manager
             .generate_access_token(old_token.user_id)
             .map_err(AppError::from)?;
 
-        // Supprime l'ancien refresh token
         RefreshTokenRepository::delete(old_token.id)
             .inspect_err(|e| {
                 tracing::error!("Failed to delete old refresh token {}: {e}", old_token.id);
             })
             .ok();
 
-        // Crée un nouveau refresh token
         let new_refresh_token_str = uuid::Uuid::new_v4().to_string();
         let new_refresh_token_hash = super::password::PasswordManager::hash(&new_refresh_token_str)
             .map_err(AppError::from)?;
