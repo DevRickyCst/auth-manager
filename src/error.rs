@@ -211,10 +211,6 @@ impl AppError {
         AppError::TooManyAttempts(msg.into())
     }
 
-    pub fn hashing_failed(msg: impl Into<String>) -> Self {
-        AppError::PasswordHashingFailed(msg.into())
-    }
-
     pub fn token_generation_failed(msg: impl Into<String>) -> Self {
         AppError::TokenGenerationFailed(msg.into())
     }
@@ -238,6 +234,13 @@ impl From<crate::db::error::RepositoryError> for AppError {
             | crate::db::error::RepositoryError::ForeignKeyViolation(msg)
             | crate::db::error::RepositoryError::DatabaseError(msg) => AppError::database(&msg),
         }
+    }
+}
+
+// Depuis PasswordError
+impl From<crate::auth::password::PasswordError> for AppError {
+    fn from(err: crate::auth::password::PasswordError) -> Self {
+        AppError::PasswordHashingFailed(err.to_string())
     }
 }
 

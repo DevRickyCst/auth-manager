@@ -51,9 +51,10 @@ pub fn init_test_pool() {
     static INIT: Once = Once::new();
 
     INIT.call_once(|| {
-        if std::env::var("DATABASE_URL").is_ok() {
-            let _ = init_pool();
-        }
+        let url = std::env::var("TEST_DATABASE_URL")
+            .or_else(|_| std::env::var("DATABASE_URL"))
+            .expect("TEST_DATABASE_URL (or DATABASE_URL) must be set for tests");
+        let _ = init_pool_with_url(&url);
     });
 }
 

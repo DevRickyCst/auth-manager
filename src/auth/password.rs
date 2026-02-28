@@ -1,14 +1,22 @@
 use bcrypt::{DEFAULT_COST, hash, verify};
 
+#[derive(Debug, thiserror::Error)]
+pub enum PasswordError {
+    #[error("Password hashing failed: {0}")]
+    HashingFailed(bcrypt::BcryptError),
+    #[error("Password verification failed: {0}")]
+    VerificationFailed(bcrypt::BcryptError),
+}
+
 pub struct PasswordManager;
 
 impl PasswordManager {
-    pub fn hash(password: &str) -> Result<String, String> {
-        hash(password, DEFAULT_COST).map_err(|e| format!("Password hashing failed: {e}"))
+    pub fn hash(password: &str) -> Result<String, PasswordError> {
+        hash(password, DEFAULT_COST).map_err(PasswordError::HashingFailed)
     }
 
-    pub fn verify(password: &str, hash: &str) -> Result<bool, String> {
-        verify(password, hash).map_err(|e| format!("Password verification failed: {e}"))
+    pub fn verify(password: &str, hash: &str) -> Result<bool, PasswordError> {
+        verify(password, hash).map_err(PasswordError::VerificationFailed)
     }
 }
 
@@ -42,6 +50,7 @@ mod tests {
         assert!(!PasswordManager::verify(password1, &hash2).unwrap());
         assert!(!PasswordManager::verify(password2, &hash1).unwrap());
     }
+
     #[test]
     fn verify_fails_when_case_differs() {
         let password = "MyPassword";

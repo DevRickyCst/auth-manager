@@ -78,14 +78,14 @@ impl AuthService {
             .ok_or_else(|| AppError::database("Password not set for user"))?;
         // Vérifie le ancien password
         if !super::password::PasswordManager::verify(old_password, password_hash)
-            .map_err(AppError::hashing_failed)?
+            .map_err(AppError::from)?
         {
             return Err(AppError::InvalidPassword);
         }
 
         // Hash le nouveau password
-        let new_password_hash = super::password::PasswordManager::hash(new_password)
-            .map_err(AppError::hashing_failed)?;
+        let new_password_hash =
+            super::password::PasswordManager::hash(new_password).map_err(AppError::from)?;
 
         // Met à jour le password
         UserRepository::update_password(user_id, &new_password_hash)?;
@@ -114,7 +114,7 @@ impl AuthService {
 
         // Hash le password
         let password_hash = super::password::PasswordManager::hash(&register_request.password)
-            .map_err(AppError::hashing_failed)?;
+            .map_err(AppError::from)?;
 
         let new_user = NewUser {
             email: register_request.email,
@@ -166,7 +166,7 @@ impl AuthService {
             .ok_or_else(|| AppError::database("Password not set for user"))?;
 
         if !super::password::PasswordManager::verify(&login_request.password, password_hash)
-            .map_err(AppError::hashing_failed)?
+            .map_err(AppError::from)?
         {
             let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent);
             return Err(AppError::InvalidPassword);
@@ -179,8 +179,8 @@ impl AuthService {
             .map_err(AppError::from)?;
 
         let refresh_token = uuid::Uuid::new_v4().to_string();
-        let refresh_token_hash = super::password::PasswordManager::hash(&refresh_token)
-            .map_err(AppError::hashing_failed)?;
+        let refresh_token_hash =
+            super::password::PasswordManager::hash(&refresh_token).map_err(AppError::from)?;
 
         let new_refresh_token = NewRefreshToken {
             user_id: user.id,
@@ -242,7 +242,7 @@ impl AuthService {
         // Crée un nouveau refresh token
         let new_refresh_token_str = uuid::Uuid::new_v4().to_string();
         let new_refresh_token_hash = super::password::PasswordManager::hash(&new_refresh_token_str)
-            .map_err(AppError::hashing_failed)?;
+            .map_err(AppError::from)?;
 
         let new_refresh_token = NewRefreshToken {
             user_id: old_token.user_id,
