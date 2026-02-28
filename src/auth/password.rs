@@ -1,14 +1,22 @@
 use bcrypt::{DEFAULT_COST, hash, verify};
 
+#[derive(Debug, thiserror::Error)]
+pub enum PasswordError {
+    #[error("Password hashing failed: {0}")]
+    HashingFailed(bcrypt::BcryptError),
+    #[error("Password verification failed: {0}")]
+    VerificationFailed(bcrypt::BcryptError),
+}
+
 pub struct PasswordManager;
 
 impl PasswordManager {
-    pub fn hash(password: &str) -> Result<String, String> {
-        hash(password, DEFAULT_COST).map_err(|e| format!("Password hashing failed: {}", e))
+    pub fn hash(password: &str) -> Result<String, PasswordError> {
+        hash(password, DEFAULT_COST).map_err(PasswordError::HashingFailed)
     }
 
-    pub fn verify(password: &str, hash: &str) -> Result<bool, String> {
-        verify(password, hash).map_err(|e| format!("Password verification failed: {}", e))
+    pub fn verify(password: &str, hash: &str) -> Result<bool, PasswordError> {
+        verify(password, hash).map_err(PasswordError::VerificationFailed)
     }
 }
 
@@ -17,7 +25,7 @@ mod tests {
     use super::PasswordManager;
 
     #[test]
-    fn test_password_hash_and_verify() {
+    fn hash_and_verify_succeeds_with_correct_password() {
         let password = "secure_password_@123P";
         let hashed = PasswordManager::hash(password).expect("Hashing failed");
 
@@ -28,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_users_different_hashes() {
+    fn hash_produces_unique_hashes_for_same_password() {
         let password1 = "user1_password";
         let password2 = "user2_password";
 
@@ -42,8 +50,9 @@ mod tests {
         assert!(!PasswordManager::verify(password1, &hash2).unwrap());
         assert!(!PasswordManager::verify(password2, &hash1).unwrap());
     }
+
     #[test]
-    fn test_verify_case_sensitive() {
+    fn verify_fails_when_case_differs() {
         let password = "MyPassword";
         let hash = PasswordManager::hash(password).unwrap();
 

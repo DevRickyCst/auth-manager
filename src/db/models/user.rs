@@ -23,9 +23,7 @@ pub struct User {
     pub email_verified: bool,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
-    #[allow(dead_code)]
     pub updated_at: DateTime<Utc>,
-    #[allow(dead_code)]
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
@@ -47,5 +45,6 @@ impl From<User> for UserResponse {
 pub struct UpdateUser {
     pub email_verified: Option<bool>,
     pub is_active: Option<bool>,
+    #[allow(clippy::option_option)]
     pub last_login_at: Option<Option<DateTime<Utc>>>,
 }

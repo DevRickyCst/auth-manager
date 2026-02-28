@@ -80,7 +80,7 @@ mod tests {
     // Test 1: Créer un refresh token
     // ============================================
     #[test]
-    fn test_create_refresh_token_success() {
+    fn create_refresh_token_succeeds() {
         // Arrange
         let user_id = create_test_user(); // ← Créer le user d'abord
         let new_token = create_test_refresh_token(user_id);
@@ -89,8 +89,7 @@ mod tests {
         let result = RefreshTokenRepository::create(&new_token);
 
         // Assert
-        assert!(result.is_ok(), "Should create refresh token successfully");
-        let created = result.unwrap();
+        let created = result.expect("Should create refresh token");
         assert_eq!(created.user_id, user_id);
         assert_eq!(created.token_hash, new_token.token_hash);
 
@@ -103,7 +102,7 @@ mod tests {
     // Test 2: Trouver par hash
     // ============================================
     #[test]
-    fn test_find_by_hash_success() {
+    fn find_by_hash_returns_token_when_valid() {
         // Arrange
         let user_id = create_test_user(); // ← Créer le user
         let new_token = create_test_refresh_token(user_id);
@@ -115,10 +114,10 @@ mod tests {
         let result = RefreshTokenRepository::find_by_hash(&hash);
 
         // Assert
-        assert!(result.is_ok(), "Should find token by hash");
-        let found = result.unwrap();
-        assert!(found.is_some(), "Token should exist");
-        assert_eq!(found.unwrap().id, created.id);
+        let found = result
+            .expect("Query should succeed")
+            .expect("Token should exist");
+        assert_eq!(found.id, created.id);
 
         // Cleanup
         let _ = RefreshTokenRepository::delete(created.id);
@@ -129,13 +128,12 @@ mod tests {
     // Test 3: Hash inexistant
     // ============================================
     #[test]
-    fn test_find_by_hash_not_found() {
+    fn find_by_hash_returns_none_when_not_found() {
         // Act
         let result = RefreshTokenRepository::find_by_hash("nonexistent_hash_12345");
 
         // Assert
-        assert!(result.is_ok(), "Query should succeed");
-        let found = result.unwrap();
+        let found = result.expect("Query should succeed");
         assert!(found.is_none(), "Token should not exist");
     }
 
@@ -143,7 +141,7 @@ mod tests {
     // Test 4: Token expiré n'est pas trouvé
     // ============================================
     #[test]
-    fn test_find_by_hash_expired_token() {
+    fn find_by_hash_ignores_expired_tokens() {
         // Arrange
         let user_id = create_test_user(); // ← Créer le user
         let expired_token = NewRefreshToken {
@@ -159,8 +157,7 @@ mod tests {
         let result = RefreshTokenRepository::find_by_hash(&expired_token.token_hash);
 
         // Assert
-        assert!(result.is_ok(), "Query should succeed");
-        let found = result.unwrap();
+        let found = result.expect("Query should succeed");
         assert!(found.is_none(), "Expired token should not be found");
 
         // Cleanup
@@ -172,7 +169,7 @@ mod tests {
     // Test 5: Delete token by ID
     // ============================================
     #[test]
-    fn test_delete_by_id_success() {
+    fn delete_by_id_succeeds() {
         // Arrange
         let user_id = create_test_user(); // ← Créer le user
         let new_token = create_test_refresh_token(user_id);

@@ -19,8 +19,8 @@ pub struct RefreshToken {
     #[allow(dead_code)]
     pub token_hash: String,
     pub expires_at: DateTime<Utc>,
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Required for Diesel Queryable deserialization")]
     pub created_at: DateTime<Utc>,
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Required for Diesel Queryable deserialization")]
     pub updated_at: DateTime<Utc>,
 }

@@ -15,44 +15,36 @@ use crate::handlers::auth::{login, logout, refresh_token, register};
 use crate::handlers::health::health;
 use crate::handlers::user::{change_password, delete_user, get_current_user, get_user_by_id};
 
-/// Configure les routes d'authentification
-pub fn auth_routes(jwt_manager: JwtManager) -> Router {
-    let auth_service = Arc::new(AuthService::new(jwt_manager.clone()));
-
-    // Public endpoints (state: AuthService)
+/// Configure les routes d'authentification.
+/// `auth_service` est fourni en Extension à tous les handlers.
+/// Les routes protégées utilisent `jwt_manager` en State pour l'extracteur `AuthClaims`.
+pub fn auth_routes(jwt_manager: JwtManager, auth_service: Arc<AuthService>) -> Router {
     let public = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
-        .route("/refresh", post(refresh_token))
-        .with_state(auth_service.clone());
+        .route("/refresh", post(refresh_token));
 
-    // Protected endpoints (state: JwtManager) using AuthClaims
     let protected = Router::new()
         .route("/logout", post(logout))
-        .with_state(jwt_manager)
-        .layer(Extension(auth_service));
+        .with_state(jwt_manager);
 
-    public.merge(protected)
+    public.merge(protected).layer(Extension(auth_service))
 }
 
-/// Configure les routes utilisateur (exemple)
+/// Configure les routes utilisateur.
+/// `jwt_manager` en State pour `AuthClaims`; les handlers appellent `AuthService` directement.
 pub fn user_routes(jwt_manager: JwtManager) -> Router {
-    // Service pour les handlers
-    let auth_service = Arc::new(AuthService::new(jwt_manager.clone()));
-
     Router::new()
         .route("/me", get(get_current_user))
         .route("/{id}", get(get_user_by_id))
         .route("/{id}", delete(delete_user))
         .route("/{id}/change-password", post(change_password))
-        // Fournit JwtManager en state pour l'extracteur AuthClaims
         .with_state(jwt_manager)
-        // Fournit le service en extension pour les handlers
-        .layer(Extension(auth_service))
 }
 
 /// Construit l'application complète
 pub fn build_router(jwt_manager: JwtManager) -> Router {
+    let auth_service = Arc::new(AuthService::new(jwt_manager.clone()));
     // Configuration CORS depuis FRONTEND_URL (déjà configuré via config.rs)
     // En production: https://dofus-graal.eu
     // En développement: http://localhost:8080
@@ -97,7 +89,7 @@ pub fn build_router(jwt_manager: JwtManager) -> Router {
 
     Router::new()
         .route("/health", get(health))
-        .nest("/auth", auth_routes(jwt_manager.clone()))
+        .nest("/auth", auth_routes(jwt_manager.clone(), auth_service))
         .nest("/users", user_routes(jwt_manager))
         // Middleware CORS (doit être avant TraceLayer)
         .layer(cors)
@@ -118,10 +110,15 @@ mod tests {
         JwtManager::new("test_secret_for_auth_routes", 1)
     }
 
-    #[tokio::test]
-    async fn test_logout_requires_authorization() {
+    fn test_auth_routes() -> Router {
         let jwt = test_jwt();
-        let app = auth_routes(jwt);
+        let service = Arc::new(AuthService::new(jwt.clone()));
+        auth_routes(jwt, service)
+    }
+
+    #[tokio::test]
+    async fn logout_fails_without_authorization_header() {
+        let app = test_auth_routes();
 
         let req = Request::builder()
             .uri("/logout")
@@ -134,14 +131,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_logout_success() {
-        let jwt = test_jwt();
-
-        // Create a user to generate a token
+    async fn logout_succeeds_with_valid_bearer_token() {
         use crate::auth::password::PasswordManager;
         use crate::db::models::user::NewUser;
         use crate::db::repositories::user_repository::UserRepository;
 
+        let jwt = test_jwt();
+
+        // Create a user to generate a token
         let hash = PasswordManager::hash("OldPass123!").expect("hash");
         let new_user = NewUser {
             email: format!("logout_test_{}@example.com", uuid::Uuid::new_v4()),
@@ -151,12 +148,12 @@ mod tests {
         let user = UserRepository::create(&new_user).expect("create user");
         let token = jwt.generate_token(user.id, 1).expect("token");
 
-        let app = auth_routes(jwt);
+        let app = test_auth_routes();
 
         let req = Request::builder()
             .uri("/logout")
             .method("POST")
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 

@@ -6,10 +6,10 @@ use axum::{
 };
 use serde::Serialize;
 
-/// Backend wrapper for auth-manager-api's AppResponse that adds Axum integration.
+/// Backend wrapper for auth-manager-api's `AppResponse` that adds Axum integration.
 ///
-/// This type wraps the WASM-compatible ApiResponse and provides:
-/// - Axum's IntoResponse trait implementation
+/// This type wraps the WASM-compatible `ApiResponse` and provides:
+/// - Axum's `IntoResponse` trait implementation
 /// - HTTP header support
 /// - Status code conversion
 ///
@@ -68,7 +68,10 @@ where
     }
 
     /// 202 Accepted with data
-    #[allow(dead_code)]
+    #[expect(
+        dead_code,
+        reason = "Provided for HTTP completeness; no handler uses 202 yet"
+    )]
     pub fn accepted(data: T) -> Self {
         Self::new(ApiResponse::accepted(data))
     }
@@ -81,7 +84,7 @@ impl AppResponse<()> {
     }
 }
 
-/// Converts API StatusCode to Axum's StatusCode
+/// Converts API `StatusCode` to Axum's `StatusCode`
 fn convert_status(api_status: ApiStatusCode) -> StatusCode {
     match api_status {
         ApiStatusCode::Ok => StatusCode::OK,
@@ -98,7 +101,7 @@ fn convert_status(api_status: ApiStatusCode) -> StatusCode {
     }
 }
 
-/// Implements Axum's IntoResponse trait for our wrapper
+/// Implements Axum's `IntoResponse` trait for our wrapper
 impl<T> IntoResponse for AppResponse<T>
 where
     T: Serialize,
@@ -130,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ok_response() {
+    fn ok_response_has_200_status() {
         let data = TestData {
             message: "success".to_string(),
         };
@@ -139,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_created_response() {
+    fn created_response_has_201_status() {
         let data = TestData {
             message: "created".to_string(),
         };
@@ -148,14 +151,14 @@ mod tests {
     }
 
     #[test]
-    fn test_no_content_response() {
+    fn no_content_response_has_204_status() {
         let response = AppResponse::no_content();
         assert_eq!(response.inner.status, ApiStatusCode::NoContent);
         assert!(response.inner.data.is_none());
     }
 
     #[test]
-    fn test_response_with_headers() {
+    fn response_with_headers_includes_custom_header() {
         let mut headers = HeaderMap::new();
         headers.insert("X-Custom-Header", "value".parse().unwrap());
 
@@ -167,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_status_conversion() {
+    fn status_conversion_maps_correctly() {
         assert_eq!(convert_status(ApiStatusCode::Ok), StatusCode::OK);
         assert_eq!(convert_status(ApiStatusCode::Created), StatusCode::CREATED);
         assert_eq!(

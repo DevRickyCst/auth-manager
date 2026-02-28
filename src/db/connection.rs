@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 static POOL: OnceLock<DbPool> = OnceLock::new();
 
-/// Initialize the PostgreSQL connection pool with the given database URL.
+/// Initialize the `PostgreSQL` connection pool with the given database URL.
 /// This should be called once at application startup.
 pub fn init_pool_with_url(database_url: &str) -> Result<()> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
@@ -22,7 +22,7 @@ pub fn init_pool_with_url(database_url: &str) -> Result<()> {
     Ok(())
 }
 
-/// Initialize the PostgreSQL connection pool using DATABASE_URL env var.
+/// Initialize the `PostgreSQL` connection pool using `DATABASE_URL` env var.
 /// This should be called once at application startup.
 #[allow(dead_code)]
 pub fn init_pool() -> Result<()> {
@@ -31,31 +31,21 @@ pub fn init_pool() -> Result<()> {
 }
 
 /// Get a reference to the initialized pool.
-/// Panics if the pool hasn't been initialized with init_pool().
+///
+/// # Panics
+///
+/// Panics if [`init_pool_with_url`] hasn't been called before this function.
 pub fn get_pool() -> &'static DbPool {
     POOL.get()
         .expect("DB pool not initialized. Call init_pool() first.")
 }
 
 /// Get a connection from the pool.
-/// Returns RepositoryError for use in repository layer.
+/// Returns `RepositoryError` for use in repository layer.
 pub fn get_connection() -> Result<DbConnection, RepositoryError> {
     get_pool()
         .get()
         .map_err(|e| RepositoryError::PoolError(e.to_string()))
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn create_pool() -> Result<DbPool> {
-    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
-
-    let manager = ConnectionManager::<PgConnection>::new(&database_url);
-
-    diesel::r2d2::Pool::builder()
-        .max_size(5)
-        .build(manager)
-        .context("Failed to create pool")
 }
 
 #[cfg(test)]
@@ -64,9 +54,10 @@ pub fn init_test_pool() {
     static INIT: Once = Once::new();
 
     INIT.call_once(|| {
-        if std::env::var("DATABASE_URL").is_ok() {
-            let _ = init_pool();
-        }
+        let url = std::env::var("TEST_DATABASE_URL")
+            .or_else(|_| std::env::var("DATABASE_URL"))
+            .expect("TEST_DATABASE_URL (or DATABASE_URL) must be set for tests");
+        let _ = init_pool_with_url(&url);
     });
 }
 
@@ -75,7 +66,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pool_initialization() {
+    fn pool_initializes_successfully() {
         init_test_pool();
         // Pool should now be initialized or skip if DATABASE_URL not set
     }

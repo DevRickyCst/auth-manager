@@ -60,7 +60,7 @@ impl UserRepository {
         Ok(())
     }
 
-    /// Mettre à jour un utilisateur (email_verified, is_active, last_login_at)
+    /// Mettre à jour un utilisateur (`email_verified`, `is_active`, `last_login_at`)
     pub fn update(id: Uuid, changes: &UpdateUser) -> Result<User, RepositoryError> {
         let mut conn = get_connection()?;
 
@@ -95,7 +95,7 @@ mod tests {
                 suffix,
                 std::time::SystemTime::now()
             ),
-            username: format!("testuser_{}", suffix),
+            username: format!("testuser_{suffix}"),
             password_hash: Some("test_hash".to_string()),
         }
     }
@@ -104,17 +104,14 @@ mod tests {
     // Test 1: Créer un utilisateur
     // ============================================
     #[test]
-    fn test_create_user_success() {
+    fn create_user_succeeds_with_valid_data() {
         let new_user = create_test_user("create");
 
-        let result = UserRepository::create(&new_user);
+        let created_user = UserRepository::create(&new_user).expect("Should create user");
 
-        assert!(result.is_ok(), "Should create user successfully");
-        let created_user = result.unwrap();
         assert_eq!(created_user.email, new_user.email);
         assert_eq!(created_user.username, new_user.username);
 
-        // Cleanup
         let _ = UserRepository::delete(created_user.id);
     }
 
@@ -122,18 +119,16 @@ mod tests {
     // Test 2: Trouver par email
     // ============================================
     #[test]
-    fn test_find_by_email_success() {
+    fn find_by_email_returns_user_when_exists() {
         let new_user = create_test_user("find_email");
         let created = UserRepository::create(&new_user).expect("Failed to create user");
 
-        let result = UserRepository::find_by_email(&new_user.email);
+        let found = UserRepository::find_by_email(&new_user.email)
+            .expect("Query should succeed")
+            .expect("User should exist");
 
-        assert!(result.is_ok(), "Should find user by email");
-        let found = result.unwrap();
-        assert!(found.is_some(), "User should exist");
-        assert_eq!(found.unwrap().id, created.id);
+        assert_eq!(found.id, created.id);
 
-        // Cleanup
         let _ = UserRepository::delete(created.id);
     }
 
@@ -141,15 +136,12 @@ mod tests {
     // Test 3: Email non existant
     // ============================================
     #[test]
-    fn test_find_by_email_not_found() {
+    fn find_by_email_returns_none_when_not_found() {
         init_test_pool();
-        let result = UserRepository::find_by_email("nonexistent_email_12345@example.com");
 
-        assert!(
-            result.is_ok(),
-            "Query should succeed even if user not found"
-        );
-        let found = result.unwrap();
+        let found = UserRepository::find_by_email("nonexistent_email_12345@example.com")
+            .expect("Query should succeed even if user not found");
+
         assert!(found.is_none(), "User should not exist");
     }
 
@@ -157,18 +149,16 @@ mod tests {
     // Test 4: Trouver par ID
     // ============================================
     #[test]
-    fn test_find_by_id_success() {
+    fn find_by_id_returns_user_when_exists() {
         let new_user = create_test_user("find_id");
         let created = UserRepository::create(&new_user).expect("Failed to create user");
 
-        let result = UserRepository::find_by_id(created.id);
+        let found = UserRepository::find_by_id(created.id)
+            .expect("Query should succeed")
+            .expect("User should exist");
 
-        assert!(result.is_ok(), "Should find user by id");
-        let found = result.unwrap();
-        assert!(found.is_some(), "User should exist");
-        assert_eq!(found.unwrap().id, created.id);
+        assert_eq!(found.id, created.id);
 
-        // Cleanup
         let _ = UserRepository::delete(created.id);
     }
 
@@ -176,17 +166,12 @@ mod tests {
     // Test 5: ID non existant
     // ============================================
     #[test]
-    fn test_find_by_id_not_found() {
+    fn find_by_id_returns_none_when_not_found() {
         init_test_pool();
-        let random_id = Uuid::new_v4();
 
-        let result = UserRepository::find_by_id(random_id);
+        let found = UserRepository::find_by_id(Uuid::new_v4())
+            .expect("Query should succeed even if user not found");
 
-        assert!(
-            result.is_ok(),
-            "Query should succeed even if user not found"
-        );
-        let found = result.unwrap();
         assert!(found.is_none(), "User should not exist");
     }
 
@@ -194,29 +179,29 @@ mod tests {
     // Test 6: Update last login
     // ============================================
     #[test]
-    fn test_update_last_login_success() {
+    fn update_last_login_succeeds() {
         let new_user = create_test_user("login");
         let created = UserRepository::create(&new_user).expect("Failed to create user");
         let user_id = created.id;
 
         let before = UserRepository::find_by_id(user_id)
-            .expect("Should find user")
+            .expect("Query should succeed")
             .expect("User should exist");
         assert!(
             before.last_login_at.is_none(),
             "last_login_at should be None initially"
         );
 
-        let result = UserRepository::update_last_login(user_id);
-
-        assert!(result.is_ok(), "Should update last_login successfully");
+        UserRepository::update_last_login(user_id).expect("Should update last_login");
 
         let after = UserRepository::find_by_id(user_id)
-            .expect("Should find user")
+            .expect("Query should succeed")
             .expect("User should exist");
-        assert!(after.last_login_at.is_some(), "last_login_at should be set");
+        assert!(
+            after.last_login_at.is_some(),
+            "last_login_at should be set after update"
+        );
 
-        // Cleanup
         let _ = UserRepository::delete(user_id);
     }
 
@@ -224,7 +209,7 @@ mod tests {
     // Test 7: Duplicate email
     // ============================================
     #[test]
-    fn test_create_duplicate_email_fails() {
+    fn create_fails_when_email_already_exists() {
         init_test_pool();
         let email = format!("duplicate_{}@example.com", Uuid::new_v4());
         let user1 = NewUser {
@@ -233,7 +218,7 @@ mod tests {
             password_hash: Some("hash".to_string()),
         };
         let user2 = NewUser {
-            email: email.clone(),
+            email,
             username: "user2".to_string(),
             password_hash: Some("hash".to_string()),
         };
@@ -255,7 +240,7 @@ mod tests {
     // Test 8: Update password
     // ============================================
     #[test]
-    fn test_update_password_success() {
+    fn update_password_succeeds() {
         init_test_pool();
         let new_user = NewUser {
             email: format!("update_pw_{}@example.com", Uuid::new_v4()),
@@ -267,8 +252,7 @@ mod tests {
         let user_id = created.id;
 
         let new_hash = PasswordManager::hash("NewPass456!").expect("hash");
-        let result = UserRepository::update_password(user_id, &new_hash);
-        assert!(result.is_ok(), "Should update password successfully");
+        UserRepository::update_password(user_id, &new_hash).expect("Should update password");
 
         let updated = UserRepository::find_by_id(user_id)
             .expect("Should find user")

@@ -8,7 +8,7 @@ use auth_manager_api::{
     LoginRequest, PublicLoginResponse, RefreshTokenRequest, RefreshTokenResponse, RegisterRequest,
     UserResponse,
 };
-use axum::extract::{Extension, State};
+use axum::extract::Extension;
 use axum::{
     Json,
     http::{HeaderMap, HeaderValue},
@@ -27,7 +27,7 @@ pub async fn register(
 /// POST /auth/login
 /// Connexion d'un utilisateur
 pub async fn login(
-    State(auth_service): State<Arc<AuthService>>,
+    Extension(auth_service): Extension<Arc<AuthService>>,
     headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
 ) -> Result<AppResponse<PublicLoginResponse>, AppError> {
@@ -35,14 +35,13 @@ pub async fn login(
     let user_agent = headers
         .get("user-agent")
         .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
-    let (response, refresh_hash) = auth_service.login(payload, user_agent)?;
+    let (response, refresh_hash) = auth_service.login(&payload, user_agent)?;
 
     // Refresh token hash en cookie HttpOnly uniquement — jamais dans le body
     let cookie_val = format!(
-        "refresh_token={}; HttpOnly; Secure; SameSite=None; Path=/auth/refresh",
-        refresh_hash
+        "refresh_token={refresh_hash}; HttpOnly; Secure; SameSite=None; Path=/auth/refresh"
     );
     let mut out_headers = HeaderMap::new();
     out_headers.insert(
@@ -57,7 +56,7 @@ pub async fn login(
 /// POST /auth/refresh
 /// Rafraîchissement des tokens
 pub async fn refresh_token(
-    State(auth_service): State<Arc<AuthService>>,
+    Extension(auth_service): Extension<Arc<AuthService>>,
     headers: HeaderMap,
 ) -> Result<AppResponse<RefreshTokenResponse>, AppError> {
     // Read refresh_token hash from Cookie header
@@ -68,23 +67,21 @@ pub async fn refresh_token(
 
     let refresh_hash = raw_cookie
         .split(';')
-        .filter_map(|kv| {
+        .find_map(|kv| {
             let mut it = kv.trim().splitn(2, '=');
             match (it.next(), it.next()) {
                 (Some("refresh_token"), Some(v)) => Some(v.trim().to_string()),
                 _ => None,
             }
         })
-        .next()
         .ok_or_else(|| AppError::validation("Missing refresh_token cookie"))?;
 
-    let (response, new_refresh_hash) = auth_service.refresh_token(RefreshTokenRequest {
+    let (response, new_refresh_hash) = auth_service.refresh_token(&RefreshTokenRequest {
         refresh_token: refresh_hash,
     })?;
 
     let cookie_val = format!(
-        "refresh_token={}; HttpOnly; Secure; SameSite=None; Path=/auth/refresh",
-        new_refresh_hash
+        "refresh_token={new_refresh_hash}; HttpOnly; Secure; SameSite=None; Path=/auth/refresh"
     );
     let mut out_headers = HeaderMap::new();
     out_headers.insert(
@@ -98,11 +95,8 @@ pub async fn refresh_token(
 
 /// POST /auth/logout
 /// Déconnexion (optionnel)
-pub async fn logout(
-    claims: AuthClaims,
-    Extension(auth_service): Extension<Arc<AuthService>>,
-) -> Result<AppResponse<serde_json::Value>, AppError> {
-    auth_service.logout(claims.sub)?;
+pub async fn logout(claims: AuthClaims) -> Result<AppResponse<serde_json::Value>, AppError> {
+    AuthService::logout(claims.sub)?;
     Ok(AppResponse::ok(serde_json::json!({
         "message": "Logged out successfully"
     })))
