@@ -268,10 +268,19 @@ impl AuthService {
     }
 
     fn is_strong_password(password: &str) -> bool {
-        password.len() >= 8
-            && password.chars().any(char::is_uppercase)
-            && password.chars().any(char::is_lowercase)
-            && password.chars().any(char::is_numeric)
+        if password.len() < 8 {
+            return false;
+        }
+        let (mut upper, mut lower, mut digit) = (false, false, false);
+        for c in password.chars() {
+            upper |= c.is_uppercase();
+            lower |= c.is_lowercase();
+            digit |= c.is_ascii_digit();
+            if upper && lower && digit {
+                return true;
+            }
+        }
+        upper && lower && digit
     }
 }
 
