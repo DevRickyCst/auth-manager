@@ -8,13 +8,24 @@ pub enum PasswordError {
     VerificationFailed(bcrypt::BcryptError),
 }
 
+/// Stateless helper for bcrypt password hashing and verification.
 pub struct PasswordManager;
 
 impl PasswordManager {
+    /// Hashes `password` with bcrypt at the default cost factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PasswordError::HashingFailed`] if bcrypt fails.
     pub fn hash(password: &str) -> Result<String, PasswordError> {
         hash(password, DEFAULT_COST).map_err(PasswordError::HashingFailed)
     }
 
+    /// Returns `true` if `password` matches the bcrypt `hash`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PasswordError::VerificationFailed`] if bcrypt fails.
     pub fn verify(password: &str, hash: &str) -> Result<bool, PasswordError> {
         verify(password, hash).map_err(PasswordError::VerificationFailed)
     }

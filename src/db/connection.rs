@@ -69,8 +69,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pool_initializes_successfully() {
+    fn pool_initializes_and_returns_connection() {
         init_test_pool();
-        // Pool should now be initialized or skip if DATABASE_URL not set
+        let conn = get_connection();
+        assert!(
+            conn.is_ok(),
+            "Should get a connection from the initialized pool"
+        );
     }
 }
