@@ -143,7 +143,8 @@ impl AuthService {
         let user = match UserRepository::find_by_email(&login_request.email) {
             Ok(Some(u)) => u,
             Ok(None) => {
-                let _ = LoginAttemptRepository::create(None, false, user_agent);
+                let _ = LoginAttemptRepository::create(None, false, user_agent)
+                    .inspect_err(|e| tracing::warn!("Failed to log login attempt: {e}"));
                 return Err(AppError::not_found("User"));
             }
             Err(e) => return Err(AppError::from(e)),
@@ -152,7 +153,7 @@ impl AuthService {
         // Brute-force protection: vérifie le nombre de tentatives récentes
         let failed_count =
             LoginAttemptRepository::count_failed_attempts(user.id, LOCKOUT_WINDOW_MINUTES)
-                .unwrap_or(0);
+                .map_err(AppError::from)?;
         if failed_count >= MAX_FAILED_ATTEMPTS {
             return Err(AppError::TooManyAttempts(format!(
                 "Account temporarily locked after {MAX_FAILED_ATTEMPTS} failed attempts. Try again in {LOCKOUT_WINDOW_MINUTES} minutes."
@@ -168,7 +169,8 @@ impl AuthService {
         if !super::password::PasswordManager::verify(&login_request.password, password_hash)
             .map_err(AppError::from)?
         {
-            let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent);
+            let _ = LoginAttemptRepository::create(Some(user.id), false, user_agent)
+                .inspect_err(|e| tracing::warn!("Failed to log failed login attempt: {e}"));
             return Err(AppError::InvalidPassword);
         }
 
@@ -195,7 +197,8 @@ impl AuthService {
         UserRepository::update_last_login(user.id)?;
 
         // Enregistre la tentative réussie
-        let _ = LoginAttemptRepository::create(Some(user.id), true, user_agent);
+        let _ = LoginAttemptRepository::create(Some(user.id), true, user_agent)
+            .inspect_err(|e| tracing::warn!("Failed to log successful login attempt: {e}"));
 
         let resp = LoginResponse {
             access_token,
