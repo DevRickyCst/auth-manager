@@ -93,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ok_response() {
+    fn ok_response_contains_data_with_200_status() {
         let data = TestData {
             message: "success".to_string(),
         };
@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn test_created_response() {
+    fn created_response_returns_201_status() {
         let data = TestData {
             message: "created".to_string(),
         };
@@ -112,14 +112,14 @@ mod tests {
     }
 
     #[test]
-    fn test_no_content_response() {
+    fn no_content_response_has_empty_data_with_204_status() {
         let response = AppResponse::no_content();
         assert_eq!(response.status, StatusCode::NoContent);
         assert!(response.data.is_none());
     }
 
     #[test]
-    fn test_serialization() {
+    fn ok_response_serializes_status_and_data_to_json() {
         let data = TestData {
             message: "test".to_string(),
         };
