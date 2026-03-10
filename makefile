@@ -30,12 +30,6 @@ help: ## Show this help message
 	@echo "  make test                     # Run all tests"
 	@echo "  make test t=test_login        # Run specific test"
 	@echo "  make db-logs                  # Follow database logs"
-	@echo ""
-	@echo "Lambda Deployment:"
-	@echo "  make deploy-create-stack      # Create Lambda stack (first time)"
-	@echo "  make deploy                   # Deploy to production Lambda"
-	@echo "  make deploy-logs              # View Lambda logs"
-	@echo "  make deploy-status            # Show stack status and outputs"
 
 # ============================================================================
 # Database Management (via root docker-compose)
@@ -145,65 +139,6 @@ run: ## Run the project locally (requires db-start and .env)
 
 dev: ## Run with cargo-watch for hot reload
 	cargo watch -x run
-
-# ============================================================================
-# Lambda Deployment (cargo-lambda + SAM)
-# ============================================================================
-
-deploy: ## Deploy to Lambda (build + sam deploy)
-	@if [ ! -f infra/params/prod.json ]; then \
-		echo "❌ infra/params/prod.json not found!"; \
-		echo "Create it from template: cp infra/params/prod.json.example infra/params/prod.json"; \
-		exit 1; \
-	fi
-	PQ_LIB_STATIC=1 cargo lambda build --release --x86-64
-	cd infra && AWS_PROFILE=perso sam deploy \
-		--stack-name auth-manager-prod \
-		--region eu-central-1 \
-		--no-confirm-changeset \
-		--no-fail-on-empty-changeset \
-		--parameter-overrides $$(jq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' params/prod.json)
-
-deploy-only: ## Deploy to Lambda without rebuilding (sam deploy only)
-	@if [ ! -f infra/params/prod.json ]; then \
-		echo "❌ infra/params/prod.json not found!"; \
-		exit 1; \
-	fi
-	cd infra && AWS_PROFILE=perso sam deploy \
-		--stack-name auth-manager-prod \
-		--region eu-central-1 \
-		--no-confirm-changeset \
-		--no-fail-on-empty-changeset \
-		--parameter-overrides $$(jq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' params/prod.json)
-
-deploy-logs: ## View Lambda logs in real-time
-	AWS_PROFILE=perso sam logs -n auth-manager-prod --tail --region eu-central-1
-
-deploy-status: ## Show Lambda stack outputs and status
-	@echo "Stack Status:"
-	@AWS_PROFILE=perso aws cloudformation describe-stacks \
-		--stack-name auth-manager-prod \
-		--region eu-central-1 \
-		--query 'Stacks[0].StackStatus' \
-		--output text
-	@echo ""
-	@echo "Stack Outputs:"
-	@AWS_PROFILE=perso aws cloudformation describe-stacks \
-		--stack-name auth-manager-prod \
-		--region eu-central-1 \
-		--query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' \
-		--output table
-
-deploy-delete: ## Delete Lambda stack (WARNING: destroys all resources)
-	@echo "WARNING: This will delete the entire Lambda stack!"
-	@read -p "Are you sure? [y/N] " -n 1 -r; \
-	echo; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		AWS_PROFILE=perso sam delete --stack-name auth-manager-prod --region eu-central-1 --no-prompts; \
-		echo "Stack deleted!"; \
-	else \
-		echo "Cancelled."; \
-	fi
 
 # ============================================================================
 # Cleanup
