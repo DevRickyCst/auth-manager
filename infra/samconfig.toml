@@ -2,7 +2,7 @@ version = 0.1
 
 [default]
 [default.global.parameters]
-stack_name = "auth-manager-prod"
+stack_name = "auth-manager-dev"
 region = "eu-central-1"
 
 [default.build.parameters]

@@ -217,11 +217,3 @@ clean-all: clean ## Remove all artifacts, volumes, and databases
 	$(ROOT_COMPOSE) down -v
 	docker volume prune -f
 	@echo "All cleaned up!"
-
-# ============================================================================
-# Docker Build Context Verification
-# ============================================================================
-
-check-context: ## Verify Docker build context size
-	@echo "Checking Docker build context size..."
-	@docker build -f infra/Dockerfile --no-cache --target builder . 2>&1 | grep "Sending build context" || echo "Build context check complete"
