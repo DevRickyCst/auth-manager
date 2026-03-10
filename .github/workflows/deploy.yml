@@ -1,0 +1,66 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master, prod]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  AWS_REGION: eu-central-1
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to AWS Lambda
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'prod' && 'production' || 'development' }}
+    env:
+      STACK_NAME: ${{ github.ref_name == 'prod' && 'auth-manager-prod' || 'auth-manager-dev' }}
+      ENV_NAME: ${{ github.ref_name == 'prod' && 'prod' || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.92
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+
+      - name: Install cargo-lambda
+        run: pip install cargo-lambda
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build
+        env:
+          PQ_LIB_STATIC: 1
+        run: cargo lambda build --release --x86-64
+
+      - name: Deploy
+        working-directory: infra
+        run: |
+          sam deploy \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              "Environment=$ENV_NAME" \
+              "DatabaseUrl=${{ secrets.DATABASE_URL }}" \
+              "JwtSecret=${{ secrets.JWT_SECRET }}" \
+              "FrontendUrl=${{ secrets.FRONTEND_URL }}"
