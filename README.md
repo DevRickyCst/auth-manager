@@ -262,12 +262,10 @@ auth-manager/
 │   └── main.rs                 # Point d'entrée (local + Lambda)
 ├── migrations/                 # Migrations Diesel
 ├── infra/                      # Infrastructure de déploiement
-│   ├── Dockerfile              # Image Lambda (builder → runtime)
 │   ├── template.yaml           # SAM template
 │   ├── samconfig.toml
 │   └── params/                 # Paramètres prod (non commités)
 ├── scripts/
-│   ├── deploy-lambda.sh        # Script de déploiement AWS
 │   └── neon-check.sh           # Vérification DB prod
 ├── postman/                    # Collection Postman
 ├── .env.example
@@ -307,8 +305,7 @@ make test-watch
 
 ## Déploiement AWS Lambda
 
-Le backend est déployé en tant qu'image Docker sur AWS Lambda via ECR + SAM.
-Le `Dockerfile` se trouve dans `infra/Dockerfile`.
+Le backend est déployé sur AWS Lambda via `cargo-lambda` + SAM (binaire natif zip sur `provided.al2023`).
 
 ### 1. Premier déploiement (création de l'infrastructure)
 

@@ -1,8 +1,13 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Auth Manager - Production Serverless Authentication Service
+Description: Auth Manager - Serverless Authentication Service
 
 Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Deployment environment
+
   DatabaseUrl:
     Type: String
     NoEcho: true
@@ -15,20 +20,20 @@ Parameters:
 
   FrontendUrl:
     Type: String
-    Default: "https://dofus-graal.eu"
     Description: Frontend URL for CORS
 
 Resources:
   # ============================================================================
   # Lambda Function
   # ============================================================================
-  # Note: ECR Repository is created manually by the deployment script
   AuthManagerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: auth-manager-prod
-      PackageType: Image
-      ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/auth-manager-prod:latest'
+      FunctionName: !Sub 'auth-manager-${Environment}'
+      PackageType: Zip
+      Runtime: provided.al2023
+      Handler: bootstrap
+      CodeUri: ../target/lambda/auth-manager/
       Timeout: 30
       MemorySize: 1024
       Architectures:
@@ -36,11 +41,11 @@ Resources:
       Tracing: Active
       Environment:
         Variables:
-          APP_ENV: production
+          APP_ENV: !Ref Environment
           DATABASE_URL: !Ref DatabaseUrl
           JWT_SECRET: !Ref JwtSecret
           FRONTEND_URL: !Ref FrontendUrl
-          RUST_LOG: info
+          RUST_LOG: !If [IsProd, info, debug]
       Events:
         HttpApiEvent:
           Type: HttpApi
@@ -58,12 +63,8 @@ Resources:
         - AWSLambdaBasicExecutionRole
         - AWSXRayDaemonWriteAccess
       Tags:
-        Environment: production
+        Environment: !Ref Environment
         Application: auth-manager
-    Metadata:
-      DockerTag: v1
-      DockerContext: ..
-      Dockerfile: docker/Dockerfile
 
   # ============================================================================
   # API Gateway HTTP API
@@ -76,7 +77,7 @@ Resources:
         DestinationArn: !GetAtt ApiAccessLogs.Arn
         Format: '$context.requestId $context.error.message $context.error.messageString'
       Tags:
-        Environment: production
+        Environment: !Ref Environment
         Application: auth-manager
 
   # ============================================================================
@@ -85,59 +86,19 @@ Resources:
   ApiAccessLogs:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/apigateway/auth-manager-prod
-      RetentionInDays: 30
+      LogGroupName: !Sub '/aws/apigateway/auth-manager-${Environment}'
+      RetentionInDays: !If [IsProd, 30, 7]
 
   FunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${AuthManagerFunction}'
-      RetentionInDays: 30
+      LogGroupName: !Sub '/aws/lambda/auth-manager-${Environment}'
+      RetentionInDays: !If [IsProd, 30, 7]
 
-  # ============================================================================
-  # CloudWatch Alarms
-  # ============================================================================
-  FunctionErrorAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: auth-manager-prod-errors
-      AlarmDescription: Alert when Lambda errors exceed threshold
-      MetricName: Errors
-      Namespace: AWS/Lambda
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 10
-      ComparisonOperator: GreaterThanThreshold
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref AuthManagerFunction
-      TreatMissingData: notBreaching
-
-  FunctionThrottleAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: auth-manager-prod-throttles
-      AlarmDescription: Alert when Lambda is throttled
-      MetricName: Throttles
-      Namespace: AWS/Lambda
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanThreshold
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref AuthManagerFunction
-      TreatMissingData: notBreaching
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
 
 Outputs:
-  ECRRepositoryUri:
-    Description: ECR Repository URI
-    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/auth-manager-prod'
-    Export:
-      Name: !Sub '${AWS::StackName}-ECRRepositoryUri'
-
   FunctionArn:
     Description: Lambda Function ARN
     Value: !GetAtt AuthManagerFunction.Arn

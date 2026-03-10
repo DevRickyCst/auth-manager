@@ -147,24 +147,34 @@ dev: ## Run with cargo-watch for hot reload
 	cargo watch -x run
 
 # ============================================================================
-# Lambda Deployment (AWS SAM + ECR)
+# Lambda Deployment (cargo-lambda + SAM)
 # ============================================================================
 
-deploy-create-stack: ## Create Lambda infrastructure (first time only)
-	AWS_PROFILE=perso ./scripts/deploy-lambda.sh --create-stack
-
-deploy: ## Deploy to Lambda (build + push + update)
+deploy: ## Deploy to Lambda (build + sam deploy)
 	@if [ ! -f infra/params/prod.json ]; then \
 		echo "❌ infra/params/prod.json not found!"; \
 		echo "Create it from template: cp infra/params/prod.json.example infra/params/prod.json"; \
-		echo "Then edit it with your production credentials."; \
 		exit 1; \
 	fi
-	@echo "✅ Using credentials from infra/params/prod.json"
-	AWS_PROFILE=perso ./scripts/deploy-lambda.sh
+	PQ_LIB_STATIC=1 cargo lambda build --release --x86-64
+	cd infra && AWS_PROFILE=perso sam deploy \
+		--stack-name auth-manager-prod \
+		--region eu-central-1 \
+		--no-confirm-changeset \
+		--no-fail-on-empty-changeset \
+		--parameter-overrides $$(jq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' params/prod.json)
 
-deploy-only: ## Update Lambda without rebuilding Docker image
-	AWS_PROFILE=perso ./scripts/deploy-lambda.sh --skip-build
+deploy-only: ## Deploy to Lambda without rebuilding (sam deploy only)
+	@if [ ! -f infra/params/prod.json ]; then \
+		echo "❌ infra/params/prod.json not found!"; \
+		exit 1; \
+	fi
+	cd infra && AWS_PROFILE=perso sam deploy \
+		--stack-name auth-manager-prod \
+		--region eu-central-1 \
+		--no-confirm-changeset \
+		--no-fail-on-empty-changeset \
+		--parameter-overrides $$(jq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' params/prod.json)
 
 deploy-logs: ## View Lambda logs in real-time
 	AWS_PROFILE=perso sam logs -n auth-manager-prod --tail --region eu-central-1
