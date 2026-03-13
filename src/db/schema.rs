@@ -47,6 +47,7 @@ diesel::table! {
         password_hash -> Nullable<Varchar>,
         email_verified -> Bool,
         is_active -> Bool,
+        is_admin -> Bool,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         last_login_at -> Nullable<Timestamptz>,

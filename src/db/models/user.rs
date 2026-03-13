@@ -22,6 +22,7 @@ pub struct User {
     pub password_hash: Option<String>,
     pub email_verified: bool,
     pub is_active: bool,
+    pub is_admin: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
@@ -35,6 +36,7 @@ impl From<User> for UserResponse {
             username: user.username,
             email_verified: user.email_verified,
             is_active: user.is_active,
+            is_admin: user.is_admin,
             created_at: user.created_at,
         }
     }
@@ -45,6 +47,7 @@ impl From<User> for UserResponse {
 pub struct UpdateUser {
     pub email_verified: Option<bool>,
     pub is_active: Option<bool>,
+    pub is_admin: Option<bool>,
     #[allow(clippy::option_option)]
     pub last_login_at: Option<Option<DateTime<Utc>>>,
 }
