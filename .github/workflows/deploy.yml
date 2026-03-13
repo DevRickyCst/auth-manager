@@ -62,5 +62,4 @@ jobs:
             --parameter-overrides \
               "Environment=$ENV_NAME" \
               "DatabaseUrl=${{ secrets.DATABASE_URL }}" \
-              "JwtSecret=${{ secrets.JWT_SECRET }}" \
-              "FrontendUrl=${{ secrets.FRONTEND_URL }}"
+              "JwtSecret=${{ secrets.JWT_SECRET }}"

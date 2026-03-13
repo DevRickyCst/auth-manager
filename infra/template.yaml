@@ -18,10 +18,6 @@ Parameters:
     NoEcho: true
     Description: JWT secret key (32+ characters)
 
-  FrontendUrl:
-    Type: String
-    Description: Frontend URL for CORS
-
 Resources:
   # ============================================================================
   # Lambda Function
@@ -44,7 +40,6 @@ Resources:
           APP_ENV: !Ref Environment
           DATABASE_URL: !Ref DatabaseUrl
           JWT_SECRET: !Ref JwtSecret
-          FRONTEND_URL: !Ref FrontendUrl
           RUST_LOG: !If [IsProd, info, debug]
       Events:
         HttpApiEvent:

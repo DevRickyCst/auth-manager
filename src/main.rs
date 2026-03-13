@@ -56,9 +56,12 @@ async fn main() -> Result<(), lambda_http::Error> {
     // Build router
     let app = build_router(jwt_manager);
 
-    // Run server based on environment
-    if config.is_production() {
-        tracing::info!("☁️  Running in AWS Lambda mode");
+    // Run server based on environment (Local → HTTP server, Dev/Prod → Lambda)
+    if !config.is_local() {
+        tracing::info!(
+            "☁️  Running in AWS Lambda mode ({})",
+            config.environment.as_str()
+        );
         lambda_http::run(app).await
     } else {
         tracing::info!("💻 Running in local HTTP server mode");
