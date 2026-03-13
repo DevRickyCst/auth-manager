@@ -58,7 +58,10 @@ async fn main() -> Result<(), lambda_http::Error> {
 
     // Run server based on environment (Local → HTTP server, Dev/Prod → Lambda)
     if !config.is_local() {
-        tracing::info!("☁️  Running in AWS Lambda mode ({})", config.environment.as_str());
+        tracing::info!(
+            "☁️  Running in AWS Lambda mode ({})",
+            config.environment.as_str()
+        );
         lambda_http::run(app).await
     } else {
         tracing::info!("💻 Running in local HTTP server mode");
