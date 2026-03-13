@@ -9,6 +9,7 @@ pub struct UserResponse {
     pub username: String,
     pub email_verified: bool,
     pub is_active: bool,
+    pub is_admin: bool,
     pub created_at: DateTime<Utc>,
 }
 
