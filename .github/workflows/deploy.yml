@@ -49,8 +49,10 @@ jobs:
 
       - name: Build
         env:
-          PQ_LIB_STATIC: "1"
-          OPENSSL_STATIC: "1"
+          # pkg-config feature in pq-sys short-circuits PQ_LIB_STATIC.
+          # PKG_CONFIG_ALL_STATIC forces pkg-config itself to emit static
+          # link flags, so libpq (and its OpenSSL deps) are linked statically.
+          PKG_CONFIG_ALL_STATIC: "1"
         run: cargo lambda build --release --x86-64 --compiler cargo
 
       - name: Verify no dynamic libpq dependency
