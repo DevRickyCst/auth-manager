@@ -30,6 +30,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          prefix-key: "v2-static-pq"
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libpq-dev libssl-dev
@@ -51,6 +52,10 @@ jobs:
           PQ_LIB_STATIC: "1"
           OPENSSL_STATIC: "1"
         run: cargo lambda build --release --x86-64 --compiler cargo
+
+      - name: Verify no dynamic libpq dependency
+        run: |
+          ldd target/lambda/auth-manager/bootstrap | grep libpq && echo "❌ libpq still dynamic!" && exit 1 || echo "✅ libpq not dynamically linked"
 
       - name: Deploy
         working-directory: infra
