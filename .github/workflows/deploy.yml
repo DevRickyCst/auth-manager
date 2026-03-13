@@ -32,10 +32,6 @@ jobs:
           cache-on-failure: true
           prefix-key: "v2-static-pq"
 
-      - name: Install system dependencies
-        # libssl-dev needed for bundled libpq's SSL support (OpenSSL headers)
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
-
       - name: Install cargo-lambda
         run: pip install cargo-lambda
 
@@ -49,9 +45,9 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build
-        # --compiler cargo: use native gcc instead of Zig so it finds system OpenSSL headers
-        # pq-sys bundled feature compiles libpq from source → no libpq.so.5 on Lambda
-        run: cargo lambda build --release --x86-64 --compiler cargo
+        # Zig cross-compiler targets glibc compatible with Lambda AL2023 (glibc 2.34)
+        # openssl vendored + pq-sys bundled → fully static, no system lib deps on Lambda
+        run: cargo lambda build --release --x86-64
 
       - name: Verify no dynamic libpq dependency
         run: |
