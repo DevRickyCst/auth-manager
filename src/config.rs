@@ -3,37 +3,52 @@ use std::env;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Environment {
-    Development,
+    /// Local development (no Lambda, localhost frontend)
+    Local,
+    /// Dev Lambda deployment (dev.dofus-graal.eu frontend)
+    Dev,
+    /// Production Lambda deployment (dofus-graal.eu frontend)
     Production,
 }
 
 impl Environment {
-    /// Détecte automatiquement l'environnement
+    /// Détecte automatiquement l'environnement.
+    /// Local   → pas de Lambda
+    /// Dev     → Lambda + APP_ENV=dev
+    /// Prod    → Lambda + APP_ENV absent/autre
     pub fn detect() -> Self {
-        // Méthode 1: Vérifier si on est dans AWS Lambda
-        if env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
-            return Self::Production;
+        if env::var("AWS_LAMBDA_FUNCTION_NAME").is_err() {
+            return Self::Local;
         }
 
-        // Méthode 2: Vérifier la variable APP_ENV
         match env::var("APP_ENV").as_deref() {
-            Ok("production" | "prod") => Self::Production,
-            _ => Self::Development,
+            Ok("dev" | "development") => Self::Dev,
+            _ => Self::Production,
         }
     }
 
-    pub fn is_production(&self) -> bool {
-        matches!(self, Self::Production)
-    }
-
-    pub fn is_development(&self) -> bool {
-        matches!(self, Self::Development)
+    pub fn is_local(&self) -> bool {
+        matches!(self, Self::Local)
     }
 
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Development => "development",
+            Self::Local => "local",
+            Self::Dev => "dev",
             Self::Production => "production",
+        }
+    }
+
+    /// Retourne les origins CORS autorisées pour cet environnement.
+    pub fn cors_origins(&self) -> &'static [&'static str] {
+        match self {
+            Self::Local => &[
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
+                "http://0.0.0.0:8080",
+            ],
+            Self::Dev => &["https://dev.dofus-graal.eu"],
+            Self::Production => &["https://dofus-graal.eu"],
         }
     }
 }
@@ -44,11 +59,6 @@ pub struct Config {
     pub database_url: String,
     pub jwt_secret: String,
     pub jwt_expiration_hours: i64,
-    #[expect(
-        dead_code,
-        reason = "CORS origin is consumed at startup in app.rs; field retained for completeness"
-    )]
-    pub frontend_url: String,
     pub server_host: String,
     pub server_port: u16,
 }
@@ -74,7 +84,6 @@ impl Config {
             .unwrap_or_else(|_| "1".to_string())
             .parse::<i64>()
             .unwrap_or(1);
-        let frontend_url = Self::get_frontend_url(&environment);
         let server_host = env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let server_port = env::var("SERVER_PORT")
             .unwrap_or_else(|_| "3000".to_string())
@@ -83,7 +92,7 @@ impl Config {
 
         tracing::info!("✅ Configuration loaded successfully");
         tracing::debug!("   Database: {}", Self::mask_credentials(&database_url));
-        tracing::debug!("   Frontend: {}", frontend_url);
+        tracing::debug!("   CORS origins: {:?}", environment.cors_origins());
         tracing::debug!("   Server: {}:{}", server_host, server_port);
 
         Ok(Self {
@@ -91,7 +100,6 @@ impl Config {
             database_url,
             jwt_secret,
             jwt_expiration_hours,
-            frontend_url,
             server_host,
             server_port,
         })
@@ -99,14 +107,14 @@ impl Config {
 
     /// Charge le bon fichier .env selon l'environnement
     fn load_env_file(environment: &Environment) {
-        // En production (Lambda), les variables sont déjà injectées
-        if environment.is_production() {
-            tracing::info!("📦 Production mode: using injected environment variables");
+        // Sur Lambda (Dev ou Production), les variables sont injectées par AWS
+        if !environment.is_local() {
+            tracing::info!("📦 Lambda mode: using injected environment variables");
             return;
         }
 
-        // En développement, charger .env
-        tracing::info!("📦 Development mode: loading .env file");
+        // En local, charger .env
+        tracing::info!("📦 Local mode: loading .env file");
 
         // Essayer de charger .env (optionnel)
         if let Ok(path) = env::current_dir() {
@@ -128,15 +136,15 @@ impl Config {
             return Ok(url);
         }
 
-        // Si en prod et DATABASE_URL manque, erreur critique
-        if environment.is_production() {
+        // Sur Lambda, DATABASE_URL est obligatoire
+        if !environment.is_local() {
             anyhow::bail!(
-                "DATABASE_URL must be set in production! \
+                "DATABASE_URL must be set on Lambda! \
                  Configure it in Lambda environment variables."
             );
         }
 
-        // En dev, construire l'URL depuis les composants
+        // En local, construire l'URL depuis les composants
         let user = env::var("POSTGRES_USER").unwrap_or_else(|_| "postgres".to_string());
         let password = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_string());
         let host = env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
@@ -152,36 +160,25 @@ impl Config {
     fn get_jwt_secret(environment: &Environment) -> Result<String> {
         let secret = match env::var("JWT_SECRET") {
             Ok(s) => s,
-            Err(_) if environment.is_production() => {
-                tracing::error!("❌ JWT_SECRET not set in production!");
-                anyhow::bail!("JWT_SECRET is required in production");
+            Err(_) if !environment.is_local() => {
+                tracing::error!("❌ JWT_SECRET not set on Lambda!");
+                anyhow::bail!("JWT_SECRET is required on Lambda");
             }
             Err(_) => {
-                tracing::warn!("⚠️  JWT_SECRET not set, using default (DEVELOPMENT ONLY!)");
+                tracing::warn!("⚠️  JWT_SECRET not set, using default (LOCAL ONLY!)");
                 "dev_secret_key_change_in_production".to_string()
             }
         };
 
-        // Valider la longueur du secret en production
-        if environment.is_production() && secret.len() < 32 {
+        // Valider la longueur du secret hors local
+        if !environment.is_local() && secret.len() < 32 {
             anyhow::bail!(
-                "JWT_SECRET must be at least 32 characters in production (current: {})",
+                "JWT_SECRET must be at least 32 characters on Lambda (current: {})",
                 secret.len()
             );
         }
 
         Ok(secret)
-    }
-
-    /// Récupère `FRONTEND_URL` avec fallback
-    fn get_frontend_url(environment: &Environment) -> String {
-        env::var("FRONTEND_URL").unwrap_or_else(|_| {
-            if environment.is_production() {
-                "https://dofus-graal.eu".to_string()
-            } else {
-                "http://localhost:8080".to_string()
-            }
-        })
     }
 
     /// Masque les credentials dans les logs
@@ -196,29 +193,25 @@ impl Config {
         url.to_string()
     }
 
-    /// Retourne true si on est en mode production
-    pub fn is_production(&self) -> bool {
-        self.environment.is_production()
-    }
-
-    /// Retourne true si on est en mode développement
-    #[expect(
-        dead_code,
-        reason = "Available for conditional behavior in request handlers"
-    )]
-    pub fn is_development(&self) -> bool {
-        self.environment.is_development()
+    pub fn is_local(&self) -> bool {
+        self.environment.is_local()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // Sérialise les tests qui modifient des variables d'environnement globales
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
-    fn environment_detects_production_for_lambda() {
+    fn environment_detects_production_for_lambda_without_app_env() {
+        let _lock = ENV_LOCK.lock().unwrap();
         unsafe {
             env::set_var("AWS_LAMBDA_FUNCTION_NAME", "test-function");
+            env::remove_var("APP_ENV");
         }
         assert_eq!(Environment::detect(), Environment::Production);
         unsafe {
@@ -227,31 +220,27 @@ mod tests {
     }
 
     #[test]
-    fn environment_respects_app_env_variable() {
+    fn environment_detects_dev_for_lambda_with_dev_app_env() {
+        let _lock = ENV_LOCK.lock().unwrap();
         unsafe {
-            env::set_var("APP_ENV", "production");
+            env::set_var("AWS_LAMBDA_FUNCTION_NAME", "test-function");
+            env::set_var("APP_ENV", "dev");
         }
-        assert_eq!(Environment::detect(), Environment::Production);
+        assert_eq!(Environment::detect(), Environment::Dev);
         unsafe {
-            env::remove_var("APP_ENV");
-        }
-
-        unsafe {
-            env::set_var("APP_ENV", "development");
-        }
-        assert_eq!(Environment::detect(), Environment::Development);
-        unsafe {
+            env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
             env::remove_var("APP_ENV");
         }
     }
 
     #[test]
-    fn environment_defaults_to_development() {
+    fn environment_defaults_to_local_without_lambda() {
+        let _lock = ENV_LOCK.lock().unwrap();
         unsafe {
             env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
             env::remove_var("APP_ENV");
         }
-        assert_eq!(Environment::detect(), Environment::Development);
+        assert_eq!(Environment::detect(), Environment::Local);
     }
 
     #[test]
