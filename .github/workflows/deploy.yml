@@ -32,7 +32,7 @@ jobs:
           cache-on-failure: true
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev libssl-dev
 
       - name: Install cargo-lambda
         run: pip install cargo-lambda
@@ -48,8 +48,9 @@ jobs:
 
       - name: Build
         env:
-          PQ_LIB_STATIC: 1
-        run: cargo lambda build --release --x86-64
+          PQ_LIB_STATIC: "1"
+          OPENSSL_STATIC: "1"
+        run: cargo lambda build --release --x86-64 --compiler cargo
 
       - name: Deploy
         working-directory: infra
