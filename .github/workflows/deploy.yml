@@ -49,8 +49,9 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build
-        # pq-sys bundled feature compiles libpq from source → no libpq.so.5 needed
-        run: cargo lambda build --release --x86-64
+        # --compiler cargo: use native gcc instead of Zig so it finds system OpenSSL headers
+        # pq-sys bundled feature compiles libpq from source → no libpq.so.5 on Lambda
+        run: cargo lambda build --release --x86-64 --compiler cargo
 
       - name: Verify no dynamic libpq dependency
         run: |
